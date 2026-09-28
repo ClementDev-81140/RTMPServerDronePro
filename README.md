@@ -12,7 +12,7 @@ Application Android haute performance transformant le smartphone en **serveur RT
 - **Décodage Matériel Local (MediaCodec H.264)** : Conversion à la volée AVCC ➔ Annex-B et rendu direct sur SurfaceView sans latence.
 - **Mode Plein Écran Immersif (⛶)** : Basculement automatique en mode paysage immersif.
 - **Persistance Locale (Room DB)** : Gestion complète des destinations (Ajout, Édition, Duplication, Priorité ⭐).
-- **Design Sombre Moderne (Style Restream)** : Interface épurée (#0E0E10) avec indicateurs de statut visuels en temps réel.
+- **Design Sombre Moderne** : Interface épurée (#0E0E10) avec indicateurs de statut visuels en temps réel.
 
 ---
 
@@ -27,7 +27,7 @@ Application Android haute performance transformant le smartphone en **serveur RT
 ## 🚀 Utilisation
 
 1. Démarrez l'application sur votre smartphone Android.
-2. Connectez le drone (DJI Fly) au point d'accès du téléphone ou sur le même réseau Wi-Fi.
+2. Connectez le drone au point d'accès du téléphone ou sur le même réseau Wi-Fi.
 3. Dans DJI Fly, réglez la diffusion en direct sur : `rtmp://[IP_DU_SMARTPHONE]:1935/live`.
 4. Configurez vos destinations (ex: URL Telegram `rtmps://...` + Clé de stream).
 5. Activez vos chaînes et appuyez sur **START STREAMING**.
