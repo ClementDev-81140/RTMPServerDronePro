@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Backgrounds -->
+    <color name="background">#0E0E10</color>
+    <color name="bg_dark">#0E0E10</color>
+    <color name="bg_card">#18181B</color>
+    <color name="bg_card_active">#102A20</color>
+    
+    <!-- Brand Accents -->
+    <color name="primary">#6C5CE7</color>
+    <color name="primary_dark">#5849C7</color>
+    <color name="accent">#00D4FF</color>
+    
+    <!-- Status Toggles -->
+    <color name="switch_on">#00F593</color>
+    <color name="switch_off">#FFFFFF</color>
+    <color name="switch_track_on">#1A4A38</color>
+    <color name="switch_track_off">#2D2D35</color>
+    
+    <!-- Status Badges -->
+    <color name="badge_live_bg">#FF3B5C</color>
+    <color name="badge_live_text">#FFFFFF</color>
+    <color name="badge_off_bg">#FFFFFF</color>
+    <color name="badge_off_text">#000000</color>
+    
+    <!-- Texts -->
+    <color name="text_primary">#FFFFFF</color>
+    <color name="text_secondary">#A0A0A8</color>
+    
+    <color name="border">#2D2D35</color>
+    <color name="error">#FF4757</color>
+</resources>

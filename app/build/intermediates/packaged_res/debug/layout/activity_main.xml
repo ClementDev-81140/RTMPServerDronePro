@@ -1,0 +1,292 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.coordinatorlayout.widget.CoordinatorLayout 
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/bg_dark">
+
+    <!-- Top Bar -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="64dp"
+        android:background="@color/bg_card"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp"
+        android:elevation="4dp">
+        
+        <ImageView
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:src="@drawable/ic_launcher"
+            android:layout_marginEnd="12dp"/>
+        
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Drone Stream"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:textColor="@color/text_primary"/>
+        
+        <TextView
+            android:id="@+id/textViewStatus"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="● OFFLINE"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            android:textColor="@color/badge_off_text"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp"
+            android:paddingTop="6dp"
+            android:paddingBottom="6dp"
+            android:background="@drawable/badge_offline"/>
+    </LinearLayout>
+
+    <androidx.core.widget.NestedScrollView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_marginTop="64dp"
+        android:fillViewport="true">
+        
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <!-- 1. PREVIEW VIDEO AVEC BOUTON PLEIN ÉCRAN -->
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/cardPreview"
+                android:layout_width="match_parent"
+                android:layout_height="200dp"
+                android:layout_marginBottom="16dp"
+                app:cardBackgroundColor="#000000"
+                app:cardCornerRadius="12dp"
+                app:strokeWidth="1dp"
+                app:strokeColor="@color/border">
+
+                <FrameLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent">
+                    <SurfaceView
+                        android:id="@+id/surfacePreview"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"/>
+                    <TextView
+                        android:id="@+id/tvPreviewPlaceholder"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_gravity="center"
+                        android:text="NO SIGNAL"
+                        android:textColor="#555555"
+                        android:textStyle="bold"
+                        android:textSize="18sp"/>
+
+                    <!-- Bouton Plein Ecran -->
+                    <ImageButton
+                        android:id="@+id/btnFullscreen"
+                        android:layout_width="40dp"
+                        android:layout_height="40dp"
+                        android:layout_gravity="top|end"
+                        android:layout_margin="8dp"
+                        android:background="#66000000"
+                        android:src="@drawable/ic_fullscreen"
+                        android:contentDescription="Fullscreen"/>
+                </FrameLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- 2. BOUTONS START / STOP -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginBottom="16dp">
+                
+                <Button
+                    android:id="@+id/buttonStart"
+                    android:layout_width="0dp"
+                    android:layout_height="56dp"
+                    android:layout_weight="1"
+                    android:layout_marginEnd="10dp"
+                    android:text="START STREAMING"
+                    android:textStyle="bold"
+                    android:textColor="#FFFFFF"
+                    app:backgroundTint="@color/primary"/>
+                
+                <Button
+                    android:id="@+id/buttonStop"
+                    android:layout_width="0dp"
+                    android:layout_height="56dp"
+                    android:layout_weight="1"
+                    android:text="STOP"
+                    android:textStyle="bold"
+                    android:textColor="@color/text_secondary"
+                    app:backgroundTint="#2D2D35"
+                    android:enabled="false"/>
+            </LinearLayout>
+
+            <!-- 3. OPTIONS RAPIDES -->
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="24dp"
+                app:cardBackgroundColor="@color/bg_card"
+                app:cardCornerRadius="12dp"
+                app:strokeWidth="1dp"
+                app:strokeColor="@color/border">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="12dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="32dp"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical">
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="Video Preview"
+                            android:textSize="13sp"
+                            android:textColor="@color/text_primary"/>
+                        <com.google.android.material.switchmaterial.SwitchMaterial
+                            android:id="@+id/switchPreview"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:checked="true"
+                            app:thumbTint="@color/switch_thumb"
+                            app:trackTint="@color/switch_track"/>
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="32dp"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical">
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="Local Recording"
+                            android:textSize="13sp"
+                            android:textColor="@color/text_primary"/>
+                        <com.google.android.material.switchmaterial.SwitchMaterial
+                            android:id="@+id/switchLocalRecording"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            app:thumbTint="@color/switch_thumb"
+                            app:trackTint="@color/switch_track"/>
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="32dp"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical">
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="Battery Saver Mode"
+                            android:textSize="13sp"
+                            android:textColor="@color/text_primary"/>
+                        <com.google.android.material.switchmaterial.SwitchMaterial
+                            android:id="@+id/switchBatterySaver"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            app:thumbTint="@color/switch_thumb"
+                            app:trackTint="@color/switch_track"/>
+                    </LinearLayout>
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- 4. DESTINATIONS -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:layout_marginBottom="12dp">
+                
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Destinations"
+                    android:textSize="16sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/text_primary"/>
+                
+                <TextView
+                    android:id="@+id/textViewActiveChannels"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="0/3"
+                    android:textSize="12sp"
+                    android:textColor="@color/text_secondary"
+                    android:layout_marginEnd="12dp"/>
+
+                <Button
+                    android:id="@+id/buttonAddChannel"
+                    android:layout_width="wrap_content"
+                    android:layout_height="36dp"
+                    android:text="+ Add"
+                    android:textSize="12sp"
+                    android:textColor="@color/bg_dark"
+                    app:backgroundTint="@color/switch_off"
+                    app:cornerRadius="18dp"/>
+            </LinearLayout>
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/recyclerViewChannels"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="24dp"/>
+
+            <!-- 5. URL DRONE -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="DRONE RTMP URL (Port: 1935)"
+                android:textSize="11sp"
+                android:textColor="@color/text_secondary"
+                android:layout_marginBottom="6dp"/>
+                
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@drawable/url_box"
+                android:padding="12dp"
+                android:layout_marginBottom="16dp">
+                <TextView
+                    android:id="@+id/textViewDroneUrl"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="rtmp://192.168.1.X:1935/live"
+                    android:textSize="13sp"
+                    android:fontFamily="monospace"
+                    android:textColor="@color/text_primary"
+                    android:textIsSelectable="true"/>
+            </LinearLayout>
+
+            <!-- 6. STATS GLOBALES -->
+            <TextView
+                android:id="@+id/textViewGlobalStats"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Waiting for stream..."
+                android:fontFamily="monospace"
+                android:textColor="@color/text_secondary"
+                android:textSize="11sp"
+                android:paddingBottom="24dp"/>
+        </LinearLayout>
+    </androidx.core.widget.NestedScrollView>
+</androidx.coordinatorlayout.widget.CoordinatorLayout>

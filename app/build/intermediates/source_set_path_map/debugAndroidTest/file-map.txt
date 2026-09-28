@@ -1,0 +1,4 @@
+com.rtmp.drone.test.app-androidTest-0 /Users/clement/RTMPServerDronePro/app/build/generated/res/resValues/androidTest/debug
+com.rtmp.drone.test.app-mergeDebugAndroidTestResources-1 /Users/clement/RTMPServerDronePro/app/build/intermediates/incremental/debugAndroidTest/mergeDebugAndroidTestResources/merged.dir
+com.rtmp.drone.test.app-mergeDebugAndroidTestResources-2 /Users/clement/RTMPServerDronePro/app/build/intermediates/incremental/debugAndroidTest/mergeDebugAndroidTestResources/stripped.dir
+com.rtmp.drone.test.app-merged_res-3 /Users/clement/RTMPServerDronePro/app/build/intermediates/merged_res/debugAndroidTest

@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="utf-8"?>
+<com.google.android.material.card.MaterialCardView 
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/cardChannel"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginHorizontal="8dp"
+    android:layout_marginVertical="3dp"
+    app:cardBackgroundColor="#18181B"
+    app:cardCornerRadius="8dp"
+    app:strokeColor="#2D2D35"
+    app:strokeWidth="1dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingHorizontal="10dp"
+        android:paddingVertical="4dp">
+
+        <!-- Étoile Chaîne Prioritaire -->
+        <TextView
+            android:id="@+id/textPrimaryStar"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="⭐ "
+            android:textSize="12sp"
+            android:visibility="gone" />
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:gravity="center_vertical">
+
+            <TextView
+                android:id="@+id/textViewChannelName"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Telegram Live"
+                android:textColor="#FFFFFF"
+                android:textSize="13sp"
+                android:textStyle="bold"
+                android:singleLine="true"
+                android:ellipsize="end" />
+
+            <TextView
+                android:id="@+id/textViewChannelStats"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="OFFLINE"
+                android:textColor="#A0A0A8"
+                android:textSize="10sp"
+                android:visibility="gone" />
+        </LinearLayout>
+
+        <ImageButton
+            android:id="@+id/buttonDuplicate"
+            android:layout_width="28dp"
+            android:layout_height="28dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:src="@android:drawable/ic_menu_save"
+            android:contentDescription="Duplicate"
+            app:tint="#A0A0A8" />
+
+        <ImageButton
+            android:id="@+id/buttonEdit"
+            android:layout_width="28dp"
+            android:layout_height="28dp"
+            android:layout_marginStart="4dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:src="@android:drawable/ic_menu_edit"
+            android:contentDescription="Edit"
+            app:tint="#6C5CE7" />
+
+        <ImageButton
+            android:id="@+id/buttonDelete"
+            android:layout_width="28dp"
+            android:layout_height="28dp"
+            android:layout_marginStart="4dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:src="@android:drawable/ic_menu_delete"
+            android:contentDescription="Delete"
+            app:tint="#FF3B5C" />
+
+        <com.google.android.material.switchmaterial.SwitchMaterial
+            android:id="@+id/switchChannelActive"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="6dp" />
+
+    </LinearLayout>
+</com.google.android.material.card.MaterialCardView>

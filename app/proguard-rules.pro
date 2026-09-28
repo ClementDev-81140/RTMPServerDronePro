@@ -1,0 +1,3 @@
+-keepattributes *Annotation*
+-keep class com.rtmp.drone.** { *; }
+-keep class com.rtmp.drone.model.** { *; }

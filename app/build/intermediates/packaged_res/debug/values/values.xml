@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="accent">#00D4FF</color>
+    <color name="background">#0E0E10</color>
+    <color name="badge_live_bg">#FF3B5C</color>
+    <color name="badge_live_text">#FFFFFF</color>
+    <color name="badge_off_bg">#FFFFFF</color>
+    <color name="badge_off_text">#000000</color>
+    <color name="bg_card">#18181B</color>
+    <color name="bg_card_active">#102A20</color>
+    <color name="bg_dark">#0E0E10</color>
+    <color name="border">#2D2D35</color>
+    <color name="error">#FF4757</color>
+    <color name="primary">#6C5CE7</color>
+    <color name="primary_dark">#5849C7</color>
+    <color name="switch_off">#FFFFFF</color>
+    <color name="switch_on">#00F593</color>
+    <color name="switch_track_off">#2D2D35</color>
+    <color name="switch_track_on">#1A4A38</color>
+    <color name="text_primary">#FFFFFF</color>
+    <color name="text_secondary">#A0A0A8</color>
+    <string name="active_channels">Chaînes actives: %d/3</string>
+    <string name="add_channel">Ajouter Chaîne</string>
+    <string name="app_name">RTMP Server Drone PRO</string>
+    <string name="battery_saver">Mode économie batterie</string>
+    <string name="cancel">Annuler</string>
+    <string name="channel_disconnected">Chaîne déconnectée: %s</string>
+    <string name="channel_name">Nom de la chaîne</string>
+    <string name="confirm_delete">Supprimer cette chaîne?</string>
+    <string name="delete">Supprimer</string>
+    <string name="drone_port">Port Drone</string>
+    <string name="drone_url">URL pour le drone</string>
+    <string name="duplicate">Dupliquer</string>
+    <string name="edit">Modifier</string>
+    <string name="failover_activated">Basculement automatique activé</string>
+    <string name="local_recording">Enregistrement local</string>
+    <string name="max_channels_reached">Maximum 3 chaînes actives simultanées</string>
+    <string name="no">Non</string>
+    <string name="preview">Aperçu vidéo</string>
+    <string name="primary_channel">Chaîne principale</string>
+    <string name="quality">Qualité</string>
+    <string name="quality_high">Haute (1080p 4Mbps)</string>
+    <string name="quality_low">Basse (720p 1Mbps)</string>
+    <string name="quality_medium">Moyenne (1080p 2.5Mbps)</string>
+    <string name="rtmp_url">URL RTMP/RTMPS</string>
+    <string name="save">Enregistrer</string>
+    <string name="start_streaming">DÉMARRER</string>
+    <string name="status_idle">En attente</string>
+    <string name="status_streaming">Streaming</string>
+    <string name="stop_streaming">ARRÊTER</string>
+    <string name="stream_key">Clé de Stream</string>
+    <string name="yes">Oui</string>
+    <style name="AppTheme" parent="Theme.Material3.Dark.NoActionBar">
+        <item name="colorPrimary">@color/primary</item>
+        <item name="colorPrimaryDark">@color/primary_dark</item>
+        <item name="colorAccent">@color/accent</item>
+        <item name="android:windowBackground">@color/background</item>
+        <item name="android:statusBarColor">@color/background</item>
+        <item name="android:navigationBarColor">@color/background</item>
+    </style>
+</resources>

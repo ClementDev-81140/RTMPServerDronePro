@@ -1,0 +1,26 @@
+[
+    {
+        "merged": "/Users/clement/.gradle/daemon/8.0/com.rtmp.drone.app-mergeDebugResources-34:/layout/item_channel.xml",
+        "source": "/Users/clement/.gradle/daemon/8.0/com.rtmp.drone.app-main-37:/layout/item_channel.xml"
+    },
+    {
+        "merged": "/Users/clement/.gradle/daemon/8.0/com.rtmp.drone.app-mergeDebugResources-34:/layout/activity_main.xml",
+        "source": "/Users/clement/.gradle/daemon/8.0/com.rtmp.drone.app-main-37:/layout/activity_main.xml"
+    },
+    {
+        "merged": "/Users/clement/.gradle/daemon/8.0/com.rtmp.drone.app-mergeDebugResources-34:/layout/activity_channel_config.xml",
+        "source": "/Users/clement/.gradle/daemon/8.0/com.rtmp.drone.app-main-37:/layout/activity_channel_config.xml"
+    },
+    {
+        "merged": "/Users/clement/.gradle/daemon/8.0/com.rtmp.drone.app-mergeDebugResources-34:/layout/activity_fullscreen_preview.xml",
+        "source": "/Users/clement/.gradle/daemon/8.0/com.rtmp.drone.app-main-37:/layout/activity_fullscreen_preview.xml"
+    },
+    {
+        "merged": "com.rtmp.drone.app-mergeDebugResources-34:/layout/item_channel.xml",
+        "source": "com.rtmp.drone.app-main-37:/layout/item_channel.xml"
+    },
+    {
+        "merged": "com.rtmp.drone.app-mergeDebugResources-34:/layout/activity_channel_config.xml",
+        "source": "com.rtmp.drone.app-main-37:/layout/activity_channel_config.xml"
+    }
+]

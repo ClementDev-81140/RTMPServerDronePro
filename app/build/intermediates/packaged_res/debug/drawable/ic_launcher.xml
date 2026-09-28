@@ -1,0 +1,41 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <!-- Fond carré arrondi -->
+    <path android:fillColor="#1F1F23"
+        android:pathData="M24,4 L84,4 A20,20 0 0,1 104,24 L104,84 A20,20 0 0,1 84,104 L24,104 A20,20 0 0,1 4,84 L4,24 A20,20 0 0,1 24,4 Z"/>
+    <!-- Bordure Violette -->
+    <path android:strokeColor="#6C5CE7" android:strokeWidth="4"
+        android:pathData="M24,4 L84,4 A20,20 0 0,1 104,24 L104,84 A20,20 0 0,1 84,104 L24,104 A20,20 0 0,1 4,84 L4,24 A20,20 0 0,1 24,4 Z"/>
+    
+    <!-- Cercle central -->
+    <path android:fillColor="#6C5CE7"
+        android:pathData="M 54,54 m -12,0 a 12,12 0 1,1 24,0 a 12,12 0 1,1 -24,0"/>
+        
+    <!-- Les 4 points -->
+    <path android:fillColor="#5849C7" android:pathData="M 36,36 m -4,0 a 4,4 0 1,1 8,0 a 4,4 0 1,1 -8,0"/>
+    <path android:fillColor="#5849C7" android:pathData="M 72,36 m -4,0 a 4,4 0 1,1 8,0 a 4,4 0 1,1 -8,0"/>
+    <path android:fillColor="#5849C7" android:pathData="M 36,72 m -4,0 a 4,4 0 1,1 8,0 a 4,4 0 1,1 -8,0"/>
+    <path android:fillColor="#5849C7" android:pathData="M 72,72 m -4,0 a 4,4 0 1,1 8,0 a 4,4 0 1,1 -8,0"/>
+    
+    <!-- Arcs de cercle (Ondes) -->
+    <path android:strokeColor="#5849C7" android:strokeWidth="4" android:strokeLineCap="round"
+        android:pathData="M 34,22 A 38,38 0 0,0 22,34"/>
+    <path android:strokeColor="#5849C7" android:strokeWidth="4" android:strokeLineCap="round"
+        android:pathData="M 28,16 A 48,48 0 0,0 16,28"/>
+        
+    <path android:strokeColor="#5849C7" android:strokeWidth="4" android:strokeLineCap="round"
+        android:pathData="M 74,22 A 38,38 0 0,1 86,34"/>
+    <path android:strokeColor="#5849C7" android:strokeWidth="4" android:strokeLineCap="round"
+        android:pathData="M 80,16 A 48,48 0 0,1 92,28"/>
+        
+    <path android:strokeColor="#5849C7" android:strokeWidth="4" android:strokeLineCap="round"
+        android:pathData="M 34,86 A 38,38 0 0,1 22,74"/>
+    <path android:strokeColor="#5849C7" android:strokeWidth="4" android:strokeLineCap="round"
+        android:pathData="M 28,92 A 48,48 0 0,1 16,80"/>
+        
+    <path android:strokeColor="#5849C7" android:strokeWidth="4" android:strokeLineCap="round"
+        android:pathData="M 74,86 A 38,38 0 0,0 86,74"/>
+    <path android:strokeColor="#5849C7" android:strokeWidth="4" android:strokeLineCap="round"
+        android:pathData="M 80,92 A 48,48 0 0,0 92,80"/>
+</vector>

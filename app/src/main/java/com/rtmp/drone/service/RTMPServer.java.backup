@@ -1,0 +1,218 @@
+package com.rtmp.drone.service;
+
+import android.util.Log;
+import java.io.*;
+import java.net.*;
+import java.nio.*;
+import java.nio.channels.*;
+import java.util.*;
+import java.util.concurrent.*;
+
+public class RTMPServer {
+    
+    private static final String TAG = "RTMPServer";
+    private static final int BUFFER_SIZE = 16384; // 16KB
+    
+    private final int port;
+    private ServerSocketChannel serverChannel;
+    private Selector selector;
+    private ExecutorService executorService;
+    private volatile boolean running = false;
+    
+    private StreamCallback callback;
+    private int connectionCount = 0;
+    
+    public interface StreamCallback {
+        void onStreamStarted(byte[] videoHeader, byte[] audioHeader);
+        void onStreamData(byte[] data, int type);
+        void onStreamStopped();
+        void onError(String error);
+    }
+    
+    public RTMPServer(int port, StreamCallback callback) {
+        this.port = port;
+        this.callback = callback;
+        
+        int cores = Runtime.getRuntime().availableProcessors();
+        executorService = Executors.newFixedThreadPool(cores * 2, r -> {
+            Thread t = new Thread(r, "RTMP-Worker");
+            t.setPriority(Thread.MAX_PRIORITY);
+            return t;
+        });
+    }
+    
+    public void start() throws IOException {
+        serverChannel = ServerSocketChannel.open();
+        serverChannel.configureBlocking(false);
+        serverChannel.socket().setReuseAddress(true);
+        serverChannel.socket().bind(new InetSocketAddress(port));
+        
+        selector = Selector.open();
+        serverChannel.register(selector, SelectionKey.OP_ACCEPT);
+        
+        running = true;
+        
+        executorService.execute(this::acceptLoop);
+        
+        Log.i(TAG, "RTMP Server started on port " + port);
+    }
+    
+    private void acceptLoop() {
+        while (running) {
+            try {
+                int ready = selector.select(1000);
+                
+                if (ready > 0) {
+                    Set<SelectionKey> keys = selector.selectedKeys();
+                    Iterator<SelectionKey> iterator = keys.iterator();
+                    
+                    while (iterator.hasNext()) {
+                        SelectionKey key = iterator.next();
+                        iterator.remove();
+                        
+                        if (key.isAcceptable()) {
+                            acceptConnection();
+                        }
+                    }
+                }
+            } catch (IOException e) {
+                if (running) {
+                    Log.e(TAG, "Accept loop error", e);
+                }
+            }
+        }
+    }
+    
+    private void acceptConnection() throws IOException {
+        SocketChannel client = serverChannel.accept();
+        if (client != null) {
+            configureSocket(client);
+            connectionCount++;
+            Log.i(TAG, "New client connected. Total: " + connectionCount);
+            executorService.execute(() -> handleClient(client));
+        }
+    }
+    
+    private void configureSocket(SocketChannel channel) throws IOException {
+        channel.configureBlocking(false);
+        Socket socket = channel.socket();
+        
+        // Ultra low latency optimizations
+        socket.setTcpNoDelay(true);
+        socket.setKeepAlive(true);
+        socket.setSoTimeout(0);
+        socket.setReceiveBufferSize(BUFFER_SIZE);
+        socket.setSendBufferSize(BUFFER_SIZE);
+        socket.setSoLinger(false, 0);
+        socket.setTrafficClass(0x10); // IPTOS_LOWDELAY
+    }
+    
+    private void handleClient(SocketChannel channel) {
+        ByteBuffer buffer = ByteBuffer.allocateDirect(BUFFER_SIZE);
+        boolean handshakeComplete = false;
+        boolean headerSent = false;
+        
+        try {
+            // RTMP Handshake
+            if (!performHandshake(channel)) {
+                Log.e(TAG, "Handshake failed");
+                return;
+            }
+            handshakeComplete = true;
+            
+            // Read packets
+            while (running && channel.isConnected()) {
+                buffer.clear();
+                int bytesRead = channel.read(buffer);
+                
+                if (bytesRead > 0) {
+                    buffer.flip();
+                    byte[] data = new byte[bytesRead];
+                    buffer.get(data);
+                    
+                    if (!headerSent) {
+                        callback.onStreamStarted(data, new byte[0]);
+                        headerSent = true;
+                    } else {
+                        int type = (data.length > 0) ? (data[0] & 0x1F) : 0;
+                        callback.onStreamData(data, type);
+                    }
+                } else if (bytesRead == -1) {
+                    break;
+                }
+            }
+            
+        } catch (IOException e) {
+            Log.e(TAG, "Client error", e);
+        } finally {
+            try {
+                channel.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+            connectionCount--;
+            callback.onStreamStopped();
+            Log.i(TAG, "Client disconnected. Remaining: " + connectionCount);
+        }
+    }
+    
+    private boolean performHandshake(SocketChannel channel) throws IOException {
+        ByteBuffer c0c1 = ByteBuffer.allocate(1537);
+        
+        // Read C0 + C1
+        while (c0c1.hasRemaining()) {
+            if (channel.read(c0c1) == -1) return false;
+        }
+        
+        // Send S0 + S1 + S2
+        ByteBuffer s0s1s2 = ByteBuffer.allocate(3073);
+        s0s1s2.put((byte) 0x03); // S0
+        
+        c0c1.flip();
+        c0c1.get(); // skip C0
+        byte[] c1 = new byte[1536];
+        c0c1.get(c1);
+        
+        s0s1s2.put(c1); // S1 = C1
+        s0s1s2.put(c1); // S2 = C1
+        s0s1s2.flip();
+        
+        while (s0s1s2.hasRemaining()) {
+            channel.write(s0s1s2);
+        }
+        
+        // Read C2
+        ByteBuffer c2 = ByteBuffer.allocate(1536);
+        while (c2.hasRemaining()) {
+            if (channel.read(c2) == -1) return false;
+        }
+        
+        return true;
+    }
+    
+    public void stop() {
+        running = false;
+        
+        try {
+            if (selector != null && selector.isOpen()) {
+                selector.close();
+            }
+            if (serverChannel != null && serverChannel.isOpen()) {
+                serverChannel.close();
+            }
+        } catch (IOException e) {
+            Log.e(TAG, "Error stopping server", e);
+        }
+        
+        executorService.shutdown();
+        Log.i(TAG, "RTMP Server stopped");
+    }
+    
+    public int getConnectionCount() {
+        return connectionCount;
+    }
+    
+    public boolean isRunning() {
+        return running;
+    }
+}
