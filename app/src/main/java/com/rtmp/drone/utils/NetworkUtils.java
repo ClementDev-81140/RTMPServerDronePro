@@ -10,7 +10,7 @@ public class NetworkUtils {
     
     public static String getLocalIpAddress(Context context) {
         try {
-            // Méthode 1: Via WifiManager
+            // First try: WifiManager
             WifiManager wifiManager = (WifiManager) context.getApplicationContext()
                 .getSystemService(Context.WIFI_SERVICE);
             if (wifiManager != null) {
@@ -20,7 +20,7 @@ public class NetworkUtils {
                 }
             }
             
-            // Méthode 2: Via NetworkInterface
+            // Second try: NetworkInterface enumeration
             for (Enumeration<NetworkInterface> en = NetworkInterface.getNetworkInterfaces(); 
                  en.hasMoreElements();) {
                 NetworkInterface intf = en.nextElement();

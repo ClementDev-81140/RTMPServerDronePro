@@ -21,6 +21,8 @@ public class StreamChannel {
 
     public enum Status { OFFLINE, CONNECTING, LIVE, ERROR }
 
+    // ---- Runtime only fields (never persisted, never used by the database) ----
+
     @Ignore
     public Status status = Status.OFFLINE;
 
@@ -69,6 +71,27 @@ public class StreamChannel {
         return "";
     }
 
+    /**
+     * Copy of the destination without any runtime data.
+     * The service works on its own copies so the database objects used by the
+     * UI can never be modified or lost by the streaming threads.
+     */
+    public StreamChannel databaseCopy() {
+        StreamChannel c = new StreamChannel();
+        c.id = this.id;
+        c.name = this.name;
+        c.rtmpUrl = this.rtmpUrl;
+        c.url = this.url;
+        c.streamKey = this.streamKey;
+        c.quality = this.quality;
+        c.targetBitrate = this.targetBitrate;
+        c.isActive = this.isActive;
+        c.isPrimary = this.isPrimary;
+        c.sortOrder = this.sortOrder;
+        return c;
+    }
+
+    /** Duplicate used by the "Duplicate" action of the destination list. */
     public StreamChannel copy() {
         StreamChannel c = new StreamChannel(
             (this.name != null ? this.name : "Channel") + " (Copy)",

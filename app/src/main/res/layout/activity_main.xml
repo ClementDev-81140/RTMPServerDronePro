@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.coordinatorlayout.widget.CoordinatorLayout 
+<androidx.coordinatorlayout.widget.CoordinatorLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
@@ -8,35 +8,37 @@
 
     <!-- Top Bar -->
     <LinearLayout
+        android:id="@+id/topBar"
         android:layout_width="match_parent"
         android:layout_height="64dp"
         android:background="@color/bg_card"
         android:orientation="horizontal"
         android:gravity="center_vertical"
         android:paddingStart="16dp"
-        android:paddingEnd="16dp"
+        android:paddingEnd="8dp"
         android:elevation="4dp">
-        
+
         <ImageView
             android:layout_width="36dp"
             android:layout_height="36dp"
             android:src="@drawable/ic_launcher"
-            android:layout_marginEnd="12dp"/>
-        
+            android:layout_marginEnd="12dp"
+            android:contentDescription="@string/app_name"/>
+
         <TextView
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="Drone Stream"
+            android:text="@string/app_short_title"
             android:textSize="18sp"
             android:textStyle="bold"
             android:textColor="@color/text_primary"/>
-        
+
         <TextView
             android:id="@+id/textViewStatus"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="● OFFLINE"
+            android:text="@string/status_offline"
             android:textSize="12sp"
             android:textStyle="bold"
             android:textColor="@color/badge_off_text"
@@ -45,21 +47,32 @@
             android:paddingTop="6dp"
             android:paddingBottom="6dp"
             android:background="@drawable/badge_offline"/>
+
+        <ImageButton
+            android:id="@+id/buttonSettings"
+            android:layout_width="42dp"
+            android:layout_height="42dp"
+            android:layout_marginStart="4dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:src="@drawable/ic_settings"
+            android:contentDescription="@string/action_settings"
+            app:tint="@color/text_secondary"/>
     </LinearLayout>
 
     <androidx.core.widget.NestedScrollView
+        android:id="@+id/contentScroll"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:layout_marginTop="64dp"
         android:fillViewport="true">
-        
+
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
             android:padding="16dp">
 
-            <!-- 1. PREVIEW VIDEO AVEC BOUTON PLEIN ÉCRAN -->
+            <!-- 1. VIDEO PREVIEW WITH FULLSCREEN BUTTON -->
             <com.google.android.material.card.MaterialCardView
                 android:id="@+id/cardPreview"
                 android:layout_width="match_parent"
@@ -82,12 +95,31 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_gravity="center"
-                        android:text="NO SIGNAL"
+                        android:gravity="center"
+                        android:text="@string/no_signal"
                         android:textColor="#555555"
                         android:textStyle="bold"
                         android:textSize="18sp"/>
 
-                    <!-- Bouton Plein Ecran -->
+                    <TextView
+                        android:id="@+id/tvRecordingIndicator"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_gravity="top|start"
+                        android:layout_margin="8dp"
+                        android:paddingStart="10dp"
+                        android:paddingEnd="10dp"
+                        android:paddingTop="5dp"
+                        android:paddingBottom="5dp"
+                        android:background="@drawable/badge_recording"
+                        android:fontFamily="monospace"
+                        android:text="@string/recording_indicator_armed"
+                        android:textColor="#FFFFFF"
+                        android:textSize="11sp"
+                        android:textStyle="bold"
+                        android:visibility="gone"/>
+
+                    <!-- Fullscreen button -->
                     <ImageButton
                         android:id="@+id/btnFullscreen"
                         android:layout_width="40dp"
@@ -96,41 +128,41 @@
                         android:layout_margin="8dp"
                         android:background="#66000000"
                         android:src="@drawable/ic_fullscreen"
-                        android:contentDescription="Fullscreen"/>
+                        android:contentDescription="@string/action_fullscreen"/>
                 </FrameLayout>
             </com.google.android.material.card.MaterialCardView>
 
-            <!-- 2. BOUTONS START / STOP -->
+            <!-- 2. START / STOP BUTTONS -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
                 android:layout_marginBottom="16dp">
-                
+
                 <Button
                     android:id="@+id/buttonStart"
                     android:layout_width="0dp"
                     android:layout_height="56dp"
                     android:layout_weight="1"
                     android:layout_marginEnd="10dp"
-                    android:text="START STREAMING"
+                    android:text="@string/start_server"
                     android:textStyle="bold"
                     android:textColor="#FFFFFF"
                     app:backgroundTint="@color/primary"/>
-                
+
                 <Button
                     android:id="@+id/buttonStop"
                     android:layout_width="0dp"
                     android:layout_height="56dp"
                     android:layout_weight="1"
-                    android:text="STOP"
+                    android:text="@string/stop_server"
                     android:textStyle="bold"
                     android:textColor="@color/text_secondary"
                     app:backgroundTint="#2D2D35"
                     android:enabled="false"/>
             </LinearLayout>
 
-            <!-- 3. OPTIONS RAPIDES -->
+            <!-- 3. QUICK OPTIONS -->
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -152,10 +184,11 @@
                         android:orientation="horizontal"
                         android:gravity="center_vertical">
                         <TextView
+                            android:id="@+id/labelPreview"
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
                             android:layout_weight="1"
-                            android:text="Video Preview"
+                            android:text="@string/option_video_preview"
                             android:textSize="13sp"
                             android:textColor="@color/text_primary"/>
                         <com.google.android.material.switchmaterial.SwitchMaterial
@@ -176,7 +209,7 @@
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
                             android:layout_weight="1"
-                            android:text="Local Recording"
+                            android:text="@string/option_local_recording"
                             android:textSize="13sp"
                             android:textColor="@color/text_primary"/>
                         <com.google.android.material.switchmaterial.SwitchMaterial
@@ -196,7 +229,7 @@
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
                             android:layout_weight="1"
-                            android:text="Battery Saver Mode"
+                            android:text="@string/option_battery_saver"
                             android:textSize="13sp"
                             android:textColor="@color/text_primary"/>
                         <com.google.android.material.switchmaterial.SwitchMaterial
@@ -206,6 +239,16 @@
                             app:thumbTint="@color/switch_thumb"
                             app:trackTint="@color/switch_track"/>
                     </LinearLayout>
+
+                    <TextView
+                        android:id="@+id/textViewBatteryHint"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:text="@string/battery_saver_hint"
+                        android:textColor="@color/switch_on"
+                        android:textSize="11sp"
+                        android:visibility="gone"/>
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
@@ -215,21 +258,21 @@
                 android:layout_height="wrap_content"
                 android:gravity="center_vertical"
                 android:layout_marginBottom="12dp">
-                
+
                 <TextView
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:text="Destinations"
+                    android:text="@string/section_destinations"
                     android:textSize="16sp"
                     android:textStyle="bold"
                     android:textColor="@color/text_primary"/>
-                
+
                 <TextView
                     android:id="@+id/textViewActiveChannels"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="0/3"
+                    android:text="0/3 active"
                     android:textSize="12sp"
                     android:textColor="@color/text_secondary"
                     android:layout_marginEnd="12dp"/>
@@ -238,7 +281,7 @@
                     android:id="@+id/buttonAddChannel"
                     android:layout_width="wrap_content"
                     android:layout_height="36dp"
-                    android:text="+ Add"
+                    android:text="@string/action_add"
                     android:textSize="12sp"
                     android:textColor="@color/bg_dark"
                     app:backgroundTint="@color/switch_off"
@@ -248,18 +291,32 @@
             <androidx.recyclerview.widget.RecyclerView
                 android:id="@+id/recyclerViewChannels"
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginBottom="24dp"/>
+                android:layout_height="wrap_content"/>
 
-            <!-- 5. URL DRONE -->
             <TextView
+                android:id="@+id/textViewEmptyChannels"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="8dp"
+                android:padding="16dp"
+                android:gravity="center"
+                android:text="@string/no_destinations"
+                android:textColor="@color/text_secondary"
+                android:textSize="12sp"
+                android:background="@drawable/url_box"
+                android:visibility="gone"/>
+
+            <!-- 5. DRONE URL -->
+            <TextView
+                android:id="@+id/textViewDroneUrlLabel"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="DRONE RTMP URL (Port: 1935)"
+                android:layout_marginTop="20dp"
+                android:layout_marginBottom="6dp"
+                android:text="DRONE RTMP URL"
                 android:textSize="11sp"
-                android:textColor="@color/text_secondary"
-                android:layout_marginBottom="6dp"/>
-                
+                android:textColor="@color/text_secondary"/>
+
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -277,12 +334,12 @@
                     android:textIsSelectable="true"/>
             </LinearLayout>
 
-            <!-- 6. STATS GLOBALES -->
+            <!-- 6. GLOBAL STATS -->
             <TextView
                 android:id="@+id/textViewGlobalStats"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="Waiting for stream..."
+                android:text="@string/stats_waiting"
                 android:fontFamily="monospace"
                 android:textColor="@color/text_secondary"
                 android:textSize="11sp"

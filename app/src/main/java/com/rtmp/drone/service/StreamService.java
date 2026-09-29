@@ -1,40 +1,65 @@
 package com.rtmp.drone.service;
 
 import android.app.*;
+import android.content.Context;
 import android.content.Intent;
 import android.os.*;
 import android.util.Log;
 import android.view.Surface;
 import androidx.core.app.NotificationCompat;
 import com.rtmp.drone.R;
+import com.rtmp.drone.model.ChannelStats;
 import com.rtmp.drone.model.StreamChannel;
+import com.rtmp.drone.ui.MainActivity;
 import com.rtmp.drone.utils.NotificationHelper;
-import java.io.IOException;
+import com.rtmp.drone.utils.PreferenceManager;
 import java.util.*;
 import java.util.concurrent.*;
 
-public class StreamService extends Service implements RTMPServer.StreamCallback {
+/**
+ * Foreground service holding the local RTMP server, the preview decoder,
+ * the optional local recorder and one streamer per active destination.
+ */
+public class StreamService extends Service implements RTMPServer.StreamCallback, LocalRecorder.Listener {
     private static final String TAG = "StreamService";
     private static final int NOTIFICATION_ID = 1001;
 
     private final IBinder binder = new LocalBinder();
     private RTMPServer rtmpServer;
     private H264Decoder decoder;
+    private LocalRecorder recorder;
+    private PreferenceManager preferences;
+
     private final Map<Integer, TelegramStreamer> streamers = new ConcurrentHashMap<>();
+    private final Set<Integer> failedChannels = Collections.synchronizedSet(new HashSet<Integer>());
     private final List<StreamChannel> channels = new CopyOnWriteArrayList<>();
+    private final List<StreamSignalListener> listeners = new CopyOnWriteArrayList<>();
     private final ExecutorService executor = Executors.newCachedThreadPool();
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
 
     private volatile boolean isStreaming = false;
     private volatile boolean isDroneSignalActive = false;
-    private byte[] cachedVideoHeader;
-    private byte[] cachedAudioHeader;
+    private volatile boolean batterySaver = false;
+    private volatile boolean previewEnabled = true;
+    private volatile boolean recordingEnabled = false;
+    private volatile int serverPort = PreferenceManager.DEFAULT_PORT;
+    private volatile long sessionStartMs = 0;
+    private volatile byte[] cachedVideoHeader;
+    private volatile byte[] cachedAudioHeader;
+    private volatile String lastRecordingName;
+    private volatile String lastRecordingLocation;
 
     public interface StreamSignalListener {
         void onDroneSignalReceived();
-        void onDroneSignalLost();
-    }
 
-    private StreamSignalListener signalListener;
+        void onDroneSignalLost();
+
+        default void onRecordingStateChanged(boolean recording, String fileName, String location, long sizeBytes) {}
+
+        default void onRecordingError(String message) {}
+
+        default void onStreamError(String message) {}
+    }
 
     public class LocalBinder extends Binder {
         public StreamService getService() {
@@ -48,9 +73,39 @@ public class StreamService extends Service implements RTMPServer.StreamCallback 
     }
 
     @Override
+    public int onStartCommand(Intent intent, int flags, int startId) {
+        if (!isStreaming) {
+            // Started without an active session (or restarted by the system): nothing to do.
+            stopSelfResult(startId);
+        }
+        return START_NOT_STICKY;
+    }
+
+    @Override
     public void onCreate() {
         super.onCreate();
         decoder = new H264Decoder();
+        preferences = new PreferenceManager(this);
+    }
+
+    // ------------------------------------------------------------- UI plumbing
+
+    public void setStreamSignalListener(StreamSignalListener listener) {
+        addStreamSignalListener(listener);
+    }
+
+    public void addStreamSignalListener(StreamSignalListener listener) {
+        if (listener == null) return;
+        listeners.add(listener);
+        if (isDroneSignalActive) listener.onDroneSignalReceived();
+        LocalRecorder current = recorder;
+        if (current != null && current.isCapturing()) {
+            listener.onRecordingStateChanged(true, current.getCurrentFileName(), current.getCurrentLocation(), 0);
+        }
+    }
+
+    public void removeStreamSignalListener(StreamSignalListener listener) {
+        listeners.remove(listener);
     }
 
     public void setPreviewSurface(Surface surface) {
@@ -59,155 +114,135 @@ public class StreamService extends Service implements RTMPServer.StreamCallback 
         }
     }
 
-    public void setStreamSignalListener(StreamSignalListener listener) {
-        this.signalListener = listener;
-        if (isDroneSignalActive && signalListener != null) {
-            signalListener.onDroneSignalReceived();
-        }
-    }
+    // ------------------------------------------------------------ stream control
 
-    public void startStreaming(int port, List<StreamChannel> targetChannels, boolean isRecording, boolean isPreview, boolean isBattery) {
-        startForeground(NOTIFICATION_ID, createNotification("Serveur RTMP en attente du drone..."));
+    public void startStreaming(int port, List<StreamChannel> targetChannels,
+                               boolean recording, boolean preview, boolean batterySaverEnabled) {
+        serverPort = port;
+        this.recordingEnabled = recording;
+        this.previewEnabled = preview;
+        this.batterySaver = batterySaverEnabled;
+
         this.channels.clear();
-        this.channels.addAll(targetChannels);
+        if (targetChannels != null) {
+            for (StreamChannel channel : targetChannels) {
+                this.channels.add(channel.databaseCopy());
+            }
+        }
+        failedChannels.clear();
         this.isStreaming = true;
+        this.isDroneSignalActive = false;
+        this.sessionStartMs = System.currentTimeMillis();
+
+        startForegroundWithNotification();
+        applyPreviewState();
+        if (recordingEnabled) ensureRecorder();
 
         executor.execute(() -> {
             try {
                 if (rtmpServer != null) {
                     rtmpServer.stop();
                 }
-                rtmpServer = new RTMPServer(port, this);
+                rtmpServer = new RTMPServer(serverPort, this);
                 rtmpServer.start();
-                Log.i(TAG, "RTMPServer running on port " + port + ". Waiting for Drone...");
-            } catch (IOException e) {
-                Log.e(TAG, "Error starting server: " + e.getMessage());
-            }
-        });
-    }
-
-    private void connectDestination(StreamChannel channel) {
-        executor.execute(() -> {
-            try {
-                Log.i(TAG, "📡 [Connect-on-Signal] Connexion de " + channel.name + " (" + channel.getUrl() + ")");
-                TelegramStreamer streamer = new TelegramStreamer(channel.getUrl(), channel.streamKey, channel.targetBitrate);
-                
-                if (cachedVideoHeader != null) {
-                    streamer.startStream(cachedVideoHeader, cachedAudioHeader);
-                }
-                
-                streamer.connect();
-                streamers.put(channel.id, streamer);
-                channel.status = StreamChannel.Status.LIVE;
-                channel.isConnected = true;
-                Log.i(TAG, "✓ " + channel.name + " est en ligne !");
+                Log.i(TAG, "RTMP server listening on port " + serverPort + ", waiting for the drone...");
+                mainHandler.post(this::updateNotification);
             } catch (Exception e) {
-                Log.e(TAG, "Échec de connexion vers " + channel.name + ": " + e.getMessage());
-                channel.status = StreamChannel.Status.ERROR;
-                channel.isConnected = false;
+                Log.e(TAG, "Cannot start the RTMP server: " + e.getMessage());
+                notifyStreamError(getString(R.string.error_server_start, e.getMessage() == null ? "" : e.getMessage()));
             }
         });
-    }
-
-    public void addChannel(StreamChannel channel) {
-        channels.add(channel);
-        if (isStreaming && isDroneSignalActive) {
-            connectDestination(channel);
-        }
-    }
-
-    public void removeChannel(StreamChannel channel) {
-        channels.remove(channel);
-        TelegramStreamer streamer = streamers.remove(channel.id);
-        if (streamer != null) {
-            streamer.stop();
-        }
-        channel.isConnected = false;
     }
 
     public void stopStreaming() {
+        release(true);
+    }
+
+    private void release(boolean stopService) {
         isStreaming = false;
         isDroneSignalActive = false;
         cachedVideoHeader = null;
         cachedAudioHeader = null;
-        
+
+        stopRecorderNow();
+
         if (rtmpServer != null) {
             rtmpServer.stop();
             rtmpServer = null;
         }
-        for (TelegramStreamer s : streamers.values()) {
-            s.stop();
+        for (TelegramStreamer streamer : streamers.values()) {
+            streamer.stop();
         }
         streamers.clear();
-        for (StreamChannel c : channels) c.isConnected = false;
+        failedChannels.clear();
 
         if (decoder != null) {
             decoder.stop();
         }
-        if (signalListener != null) {
-            signalListener.onDroneSignalLost();
-        }
-        stopForeground(true);
-        stopSelf();
-    }
+        notifyDroneSignalLost();
 
-    @Override
-    public void onStreamStarted(byte[] videoHeader, byte[] audioHeader) {
-        Log.i(TAG, "⚡ [Signal reçu] Le drone émet SPS/PPS ! Connexion immédiate des chaînes distantes...");
-        this.cachedVideoHeader = videoHeader;
-        this.cachedAudioHeader = audioHeader;
-        this.isDroneSignalActive = true;
+        try {
+            stopForeground(true);
+        } catch (Exception ignored) {}
 
-        if (decoder != null && videoHeader != null && videoHeader.length > 0) {
-            decoder.init(videoHeader);
-        }
-
-        if (signalListener != null) {
-            signalListener.onDroneSignalReceived();
-        }
-
-        for (StreamChannel channel : channels) {
-            if (channel.isActive && !streamers.containsKey(channel.id)) {
-                connectDestination(channel);
-            }
+        if (stopService) {
+            stopSelf();
         }
     }
 
-    @Override
-    public void onStreamData(byte[] data, int type, int timestamp) {
-        if (!isDroneSignalActive) {
-            return;
-        }
+    // --------------------------------------------------------- live settings UI
 
-        if (type == 9 && decoder != null) {
-            decoder.decodeFrame(data);
-        }
+    public void setPreviewEnabled(boolean enabled) {
+        this.previewEnabled = enabled;
+        applyPreviewState();
+        updateNotification();
+    }
 
-        for (TelegramStreamer s : streamers.values()) {
-            s.sendData(data, type, timestamp);
+    public void setBatterySaver(boolean enabled) {
+        this.batterySaver = enabled;
+        applyPreviewState();
+        updateNotification();
+        Log.i(TAG, "Battery saver " + (enabled ? "enabled" : "disabled"));
+    }
+
+    public void setRecordingEnabled(boolean enabled) {
+        this.recordingEnabled = enabled;
+        if (enabled) {
+            if (isStreaming) ensureRecorder();
+        } else {
+            stopRecorderNow();
+        }
+        updateNotification();
+    }
+
+    private void applyPreviewState() {
+        if (decoder == null) return;
+        boolean decode = previewEnabled && !isPreviewPausedByBatterySaver();
+        decoder.setEnabled(decode);
+        byte[] header = cachedVideoHeader;
+        if (decode && header != null && !decoder.isConfigured()) {
+            decoder.init(header);
         }
     }
 
-    @Override
-    public void onStreamStopped() {
-        Log.i(TAG, "Drone stream disconnected");
-        isDroneSignalActive = false;
-        cachedVideoHeader = null;
-        cachedAudioHeader = null;
-        
-        for (TelegramStreamer s : streamers.values()) {
-            s.stop();
-        }
-        streamers.clear();
-        
-        if (signalListener != null) {
-            signalListener.onDroneSignalLost();
-        }
+    private boolean isPreviewPausedByBatterySaver() {
+        return batterySaver && (preferences == null || preferences.isBatterySaverPausesPreview());
     }
 
-    @Override
-    public void onError(String error) {
-        Log.e(TAG, "Stream error: " + error);
+    public boolean isBatterySaverEnabled() {
+        return batterySaver;
+    }
+
+    public boolean isBatterySaverPausingPreview() {
+        return isPreviewPausedByBatterySaver();
+    }
+
+    public boolean isPreviewEnabled() {
+        return previewEnabled;
+    }
+
+    public boolean isRecordingEnabled() {
+        return recordingEnabled;
     }
 
     public boolean isStreaming() {
@@ -218,40 +253,342 @@ public class StreamService extends Service implements RTMPServer.StreamCallback 
         return isDroneSignalActive;
     }
 
-    public List<StreamChannel> getChannels() {
-        for (StreamChannel ch : channels) {
-            TelegramStreamer s = streamers.get(ch.id);
-            if (s != null && s.isStreaming()) {
-                ch.status = StreamChannel.Status.LIVE;
-                ch.currentBitrate = s.getBitrate();
-                ch.bitrate = ch.currentBitrate;
-                ch.latency = s.getLatency();
-                ch.latencyMs = ch.latency;
-                ch.bytesSent = s.getBytesSent();
-                ch.isConnected = true;
-            } else if (!isDroneSignalActive) {
-                ch.status = StreamChannel.Status.OFFLINE;
-                ch.currentBitrate = 0;
-                ch.isConnected = false;
-            }
-        }
-        return channels;
+    public int getServerPort() {
+        return serverPort;
     }
 
-    private Notification createNotification(String text) {
+    /** Time since START SERVER was pressed (0 when the server is stopped). */
+    public long getSessionUptimeMs() {
+        long start = sessionStartMs;
+        if (start <= 0) return 0;
+        return Math.max(0, System.currentTimeMillis() - start);
+    }
+
+    public boolean isRecording() {
+        LocalRecorder current = recorder;
+        return current != null && current.isRunning();
+    }
+
+    public boolean isCapturing() {
+        LocalRecorder current = recorder;
+        return current != null && current.isCapturing();
+    }
+
+    public String getRecordingFileName() {
+        LocalRecorder current = recorder;
+        if (current != null && current.isCapturing()) return current.getCurrentFileName();
+        return lastRecordingName;
+    }
+
+    public String getRecordingLocation() {
+        LocalRecorder current = recorder;
+        if (current != null && current.isCapturing()) return current.getCurrentLocation();
+        return lastRecordingLocation;
+    }
+
+    public long getRecordingDurationMs() {
+        LocalRecorder current = recorder;
+        return current != null ? current.getCaptureDurationMs() : 0;
+    }
+
+    // ---------------------------------------------------------------- recording
+
+    private synchronized void ensureRecorder() {
+        if (!recordingEnabled) return;
+        LocalRecorder current = recorder;
+        if (current != null && !current.isRunning()) {
+            recorder = null;
+            current = null;
+        }
+        if (current == null) {
+            boolean usePublicStorage = preferences != null && preferences.isPublicRecordingsEnabled();
+            current = new LocalRecorder(this, this, usePublicStorage);
+            recorder = current;
+            current.start();
+        }
+    }
+
+    private synchronized void stopRecorderNow() {
+        LocalRecorder current = recorder;
+        if (current != null) current.stop();
+    }
+
+    @Override
+    public void onRecordingStarted(String fileName, String location, int width, int height) {
+        lastRecordingName = fileName;
+        lastRecordingLocation = location;
+        mainHandler.post(() -> {
+            for (StreamSignalListener listener : listeners) {
+                listener.onRecordingStateChanged(true, fileName, location, 0);
+            }
+            updateNotification();
+        });
+    }
+
+    @Override
+    public void onRecordingFinished(String fileName, String location, long sizeBytes, String error) {
+        if (fileName != null) {
+            lastRecordingName = fileName;
+            lastRecordingLocation = location;
+        }
+        mainHandler.post(() -> {
+            if (error == null) {
+                for (StreamSignalListener listener : listeners) {
+                    listener.onRecordingStateChanged(false, fileName, location, sizeBytes);
+                }
+            } else {
+                for (StreamSignalListener listener : listeners) {
+                    listener.onRecordingStateChanged(false, null, null, 0);
+                    listener.onRecordingError(error);
+                }
+            }
+            updateNotification();
+        });
+    }
+
+    private void notifyStreamError(String message) {
+        mainHandler.post(() -> {
+            for (StreamSignalListener listener : listeners) {
+                listener.onStreamError(message);
+            }
+        });
+    }
+
+    // ------------------------------------------------------------- destinations
+
+    private void connectDestination(StreamChannel channel) {
+        final StreamChannel target = channel.databaseCopy();
+        executor.execute(() -> {
+            try {
+                Log.i(TAG, "Connecting destination " + target.name + " (" + target.getUrl() + ")");
+                TelegramStreamer streamer = new TelegramStreamer(target.getUrl(), target.streamKey, target.targetBitrate);
+
+                byte[] videoHeader = cachedVideoHeader;
+                if (videoHeader != null) {
+                    streamer.startStream(videoHeader, cachedAudioHeader);
+                }
+
+                streamer.connect();
+                streamers.put(target.id, streamer);
+                failedChannels.remove(target.id);
+                Log.i(TAG, target.name + " is live");
+            } catch (Exception e) {
+                failedChannels.add(target.id);
+                Log.e(TAG, "Connection to " + target.name + " failed: " + e.getMessage());
+            }
+        });
+    }
+
+    public void addChannel(StreamChannel channel) {
+        if (channel == null) return;
+        for (StreamChannel existing : channels) {
+            if (existing.id == channel.id) return;
+        }
+        StreamChannel copy = channel.databaseCopy();
+        channels.add(copy);
+        if (isStreaming && isDroneSignalActive && copy.isActive) {
+            connectDestination(copy);
+        }
+    }
+
+    public void removeChannel(StreamChannel channel) {
+        if (channel == null) return;
+        for (StreamChannel existing : new ArrayList<>(channels)) {
+            if (existing.id == channel.id) channels.remove(existing);
+        }
+        TelegramStreamer streamer = streamers.remove(channel.id);
+        if (streamer != null) streamer.stop();
+        failedChannels.remove(channel.id);
+    }
+
+    public int getActiveChannelCount() {
+        int count = 0;
+        for (StreamChannel channel : channels) {
+            if (channel.isActive) count++;
+        }
+        return count;
+    }
+
+    /**
+     * Live statistics of every destination, keyed by channel id.
+     * The UI merges this into its own database list: the list of the service is
+     * never used as the data source of the screen anymore.
+     */
+    public Map<Integer, ChannelStats> getStatsSnapshot() {
+        Map<Integer, ChannelStats> snapshot = new HashMap<>();
+        for (StreamChannel channel : channels) {
+            TelegramStreamer streamer = streamers.get(channel.id);
+            if (streamer != null && streamer.isStreaming()) {
+                snapshot.put(channel.id, new ChannelStats(channel.id, true, false, false,
+                        streamer.getBitrate(), streamer.getLatency(), streamer.getBytesSent()));
+            } else if (streamer != null || (isDroneSignalActive && channel.isActive)) {
+                boolean error = failedChannels.contains(channel.id);
+                snapshot.put(channel.id, new ChannelStats(channel.id, false, !error, error, 0, 0, 0));
+            }
+        }
+        return snapshot;
+    }
+
+    // -------------------------------------------------------------- RTMP events
+
+    @Override
+    public void onStreamStarted(byte[] videoHeader, byte[] audioHeader) {
+        Log.i(TAG, "Drone signal detected, connecting the active destinations...");
+        this.cachedVideoHeader = videoHeader;
+        this.cachedAudioHeader = audioHeader;
+        this.isDroneSignalActive = true;
+
+        if (videoHeader != null && decoder != null && !isPreviewPausedByBatterySaver() && previewEnabled) {
+            decoder.init(videoHeader);
+        }
+        if (recordingEnabled) {
+            ensureRecorder();
+        }
+
+        notifyDroneSignalReceived();
+        updateNotification();
+
+        for (StreamChannel channel : channels) {
+            if (channel.isActive && !streamers.containsKey(channel.id)) {
+                connectDestination(channel);
+            }
+        }
+    }
+
+    @Override
+    public void onStreamData(byte[] data, int type, int timestamp) {
+        if (!isDroneSignalActive || data == null || data.length == 0) return;
+
+        LocalRecorder current = recorder;
+        if (type == 9) {
+            if (current != null) current.writeVideo(data, timestamp);
+            if (decoder != null && decoder.isEnabled()) decoder.decodeFrame(data);
+        } else if (type == 8) {
+            if (data.length > 1 && data[1] == 0x00 && (data[0] & 0xF0) == 0xA0) {
+                // Real AAC sequence header of the drone: keep it for the destinations
+                // that will be connected later during the same session.
+                cachedAudioHeader = data;
+            }
+            if (current != null) current.writeAudio(data, timestamp);
+        }
+
+        for (TelegramStreamer streamer : streamers.values()) {
+            streamer.sendData(data, type, timestamp);
+        }
+    }
+
+    @Override
+    public void onStreamStopped() {
+        Log.i(TAG, "Drone stream disconnected");
+        isDroneSignalActive = false;
+        cachedVideoHeader = null;
+        cachedAudioHeader = null;
+
+        for (TelegramStreamer streamer : streamers.values()) {
+            streamer.stop();
+        }
+        streamers.clear();
+        failedChannels.clear();
+
+        if (decoder != null) {
+            decoder.stop();
+        }
+        stopRecorderNow();
+
+        notifyDroneSignalLost();
+        updateNotification();
+    }
+
+    @Override
+    public void onError(String error) {
+        Log.e(TAG, "Stream error: " + error);
+        notifyStreamError(error);
+    }
+
+    private void notifyDroneSignalReceived() {
+        mainHandler.post(() -> {
+            for (StreamSignalListener listener : listeners) {
+                listener.onDroneSignalReceived();
+            }
+        });
+    }
+
+    private void notifyDroneSignalLost() {
+        mainHandler.post(() -> {
+            for (StreamSignalListener listener : listeners) {
+                listener.onDroneSignalLost();
+            }
+        });
+    }
+
+    // ------------------------------------------------------------- notification
+
+    private void startForegroundWithNotification() {
         NotificationHelper.createNotificationChannel(this);
+        try {
+            Intent serviceIntent = new Intent(getApplicationContext(), StreamService.class);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                startForegroundService(serviceIntent);
+            } else {
+                startService(serviceIntent);
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "startForegroundService failed: " + e.getMessage());
+        }
+        try {
+            startForeground(NOTIFICATION_ID, buildNotification());
+        } catch (Exception e) {
+            Log.e(TAG, "startForeground failed: " + e.getMessage());
+        }
+    }
+
+    private void updateNotification() {
+        if (!isStreaming && !isCapturing()) return;
+        try {
+            NotificationManager manager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+            if (manager != null) manager.notify(NOTIFICATION_ID, buildNotification());
+        } catch (Exception e) {
+            Log.w(TAG, "Cannot update the notification: " + e.getMessage());
+        }
+    }
+
+    private Notification buildNotification() {
+        NotificationHelper.createNotificationChannel(this);
+
+        StringBuilder text = new StringBuilder();
+        if (!isStreaming) {
+            text.append(getString(R.string.notification_idle));
+        } else if (isDroneSignalActive) {
+            text.append(getString(R.string.notification_live, getActiveChannelCount()));
+        } else {
+            text.append(getString(R.string.notification_waiting, serverPort));
+        }
+        if (isCapturing()) text.append(" • REC");
+        if (batterySaver) text.append(" • ").append(getString(R.string.notification_battery_saver));
+
+        Intent openIntent = new Intent(this, MainActivity.class);
+        openIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        int flags = PendingIntent.FLAG_UPDATE_CURRENT;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) flags |= PendingIntent.FLAG_IMMUTABLE;
+        PendingIntent pendingIntent = PendingIntent.getActivity(this, 0, openIntent, flags);
+
         return new NotificationCompat.Builder(this, NotificationHelper.CHANNEL_ID)
-            .setContentTitle("RTMP Server Drone PRO")
-            .setContentText(text)
+            .setContentTitle(getString(R.string.app_name))
+            .setContentText(text.toString())
+            .setStyle(new NotificationCompat.BigTextStyle().bigText(text.toString()))
             .setSmallIcon(android.R.drawable.stat_notify_sync)
+            .setContentIntent(pendingIntent)
             .setOngoing(true)
+            .setOnlyAlertOnce(true)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
             .build();
     }
 
     @Override
     public void onDestroy() {
         super.onDestroy();
-        stopStreaming();
+        release(false);
         executor.shutdownNow();
+        Log.i(TAG, "Service destroyed");
     }
 }

@@ -133,7 +133,7 @@ public class TelegramStreamer {
         }
 
         String tcUrl = cleanUrl.endsWith("/") ? cleanUrl.substring(0, cleanUrl.length() - 1) : cleanUrl;
-        Log.i(TAG, "📡 [1/6] Connexion SSL vers " + host + ":" + port + "...");
+        Log.i(TAG, "[1/6] Connecting to " + host + ":" + port + (isRtmps ? " over TLS" : "") + "...");
 
         if (isRtmps) {
             SSLContext sslContext = SSLContext.getInstance("TLS");
@@ -165,26 +165,26 @@ public class TelegramStreamer {
         in = new BufferedInputStream(socket.getInputStream(), 64 * 1024);
 
         performHandshake();
-        Log.i(TAG, "✓ [1/6] Handshake validé");
+        Log.i(TAG, "[1/6] RTMP handshake completed");
 
         sendSetChunkSize(CHUNK_SIZE);
         sendConnect(app, tcUrl);
-        Log.i(TAG, "⏳ [2/6] En attente de validation 'connect' par Telegram...");
+        Log.i(TAG, "[2/6] Waiting for the 'connect' reply...");
         waitForResponse("_result", 4000);
-        Log.i(TAG, "✓ [2/6] Connect accepté par Telegram");
+        Log.i(TAG, "[2/6] Connect accepted by the server");
 
         sendReleaseStream(streamKey);
         sendFCPublish(streamKey);
 
         sendCreateStream();
-        Log.i(TAG, "⏳ [3/6] En attente d'allocation de canal (createStream)...");
+        Log.i(TAG, "[3/6] Waiting for the stream allocation (createStream)...");
         waitForResponse("_result", 4000);
-        Log.i(TAG, "✓ [3/6] Canal alloué (Stream ID = 1)");
+        Log.i(TAG, "[3/6] Stream allocated (Stream ID = 1)");
 
         sendPublish(streamKey);
-        Log.i(TAG, "⏳ [4/6] En attente d'autorisation de publication (publish)...");
+        Log.i(TAG, "[4/6] Waiting for the publish authorisation...");
         waitForResponse("Publish.Start", 4000);
-        Log.i(TAG, "✓ [4/6] Publication confirmée par Telegram");
+        Log.i(TAG, "[4/6] Publication confirmed by the server");
 
         streaming = true;
         startTime = System.currentTimeMillis();
@@ -193,24 +193,24 @@ public class TelegramStreamer {
         sendMetaData();
 
         if (cachedAudioHeader != null && cachedAudioHeader.length > 0) {
-            Log.i(TAG, "🔊 [5/6] Envoi du Sequence Header Audio RÉEL du drone (" + cachedAudioHeader.length + " bytes)");
+            Log.i(TAG, "[5/6] Sending the real AAC sequence header of the drone (" + cachedAudioHeader.length + " bytes)");
             sendRtmpPacket(5, 0x08, 1, 0, cachedAudioHeader);
             droneHasAudio = true;
         } else {
-            Log.i(TAG, "🔊 [5/6] Aucun audio drone détecté. Démarrage de la piste de silence AAC...");
+            Log.i(TAG, "[5/6] No drone audio detected, starting the AAC silence track...");
             sendRtmpPacket(5, 0x08, 1, 0, AAC_SEQ_HEADER);
             droneHasAudio = false;
         }
 
         if (cachedVideoHeader != null && cachedVideoHeader.length > 0) {
             sendRtmpPacket(4, 0x09, 1, 0, cachedVideoHeader);
-            Log.i(TAG, "✓ [6/6] Sequence Header H.264 (SPS/PPS) validé et transmis (" + cachedVideoHeader.length + " bytes)");
+            Log.i(TAG, "[6/6] H.264 sequence header (SPS/PPS) forwarded (" + cachedVideoHeader.length + " bytes)");
         }
 
         startIncomingPacketConsumer();
         startStatsLogger();
 
-        Log.i(TAG, "★★★ TELEGRAM EST MAINTENANT EN DIRECT LIVE ! ★★★");
+        Log.i(TAG, "=== DESTINATION IS NOW LIVE ===");
     }
 
     private void waitForResponse(String expected, int timeoutMs) throws IOException {
@@ -345,7 +345,7 @@ public class TelegramStreamer {
         logExecutor = Executors.newSingleThreadScheduledExecutor();
         logExecutor.scheduleAtFixedRate(() -> {
             if (streaming) {
-                Log.i(TAG, "📈 Stats Telegram -> Envoyés: " + (bytesSent.get() / 1024) + " KB | Vidéo: " + videoFramesSent.get() + " | Audio: " + audioFramesSent.get() + " | Débit: " + getBitrate() + " kbps");
+                Log.i(TAG, "Stats -> sent: " + (bytesSent.get() / 1024) + " KB | video: " + videoFramesSent.get() + " | audio: " + audioFramesSent.get() + " | bitrate: " + getBitrate() + " kbps");
             }
         }, 3, 3, TimeUnit.SECONDS);
     }
@@ -385,7 +385,7 @@ public class TelegramStreamer {
             }
             bytesSent.addAndGet(data.length);
         } catch (Exception e) {
-            Log.e(TAG, "❌ Erreur envoi Telegram: " + e.getMessage());
+            Log.e(TAG, "Send error: " + e.getMessage());
             stop();
         }
     }
@@ -456,7 +456,7 @@ public class TelegramStreamer {
         int t = 0;
         while (t < buf.length) {
             int r = in.read(buf, t, buf.length - t);
-            if (r <= 0) throw new IOException("Connexion fermée");
+            if (r <= 0) throw new IOException("Connection closed");
             t += r;
         }
     }
@@ -470,7 +470,7 @@ public class TelegramStreamer {
             if (in != null) in.close();
             if (socket != null) socket.close();
         } catch (Exception ignored) {}
-        Log.i(TAG, "⏹ TelegramStreamer arrêté.");
+        Log.i(TAG, "Streamer stopped.");
     }
 
     public boolean isStreaming() { return streaming; }

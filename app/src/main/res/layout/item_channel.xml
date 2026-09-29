@@ -20,7 +20,7 @@
         android:paddingHorizontal="10dp"
         android:paddingVertical="4dp">
 
-        <!-- Étoile Chaîne Prioritaire -->
+        <!-- Primary destination star -->
         <TextView
             android:id="@+id/textPrimaryStar"
             android:layout_width="wrap_content"
@@ -40,7 +40,7 @@
                 android:id="@+id/textViewChannelName"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Telegram Live"
+                android:text="@string/section_destinations"
                 android:textColor="#FFFFFF"
                 android:textSize="13sp"
                 android:textStyle="bold"
@@ -51,7 +51,7 @@
                 android:id="@+id/textViewChannelStats"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="OFFLINE"
+                android:text="@string/channel_state_off"
                 android:textColor="#A0A0A8"
                 android:textSize="10sp"
                 android:visibility="gone" />
@@ -63,7 +63,7 @@
             android:layout_height="28dp"
             android:background="?attr/selectableItemBackgroundBorderless"
             android:src="@android:drawable/ic_menu_save"
-            android:contentDescription="Duplicate"
+            android:contentDescription="@string/action_add"
             app:tint="#A0A0A8" />
 
         <ImageButton
@@ -73,7 +73,7 @@
             android:layout_marginStart="4dp"
             android:background="?attr/selectableItemBackgroundBorderless"
             android:src="@android:drawable/ic_menu_edit"
-            android:contentDescription="Edit"
+            android:contentDescription="@string/action_save"
             app:tint="#6C5CE7" />
 
         <ImageButton
@@ -83,7 +83,7 @@
             android:layout_marginStart="4dp"
             android:background="?attr/selectableItemBackgroundBorderless"
             android:src="@android:drawable/ic_menu_delete"
-            android:contentDescription="Delete"
+            android:contentDescription="@string/dialog_delete_title"
             app:tint="#FF3B5C" />
 
         <com.google.android.material.switchmaterial.SwitchMaterial

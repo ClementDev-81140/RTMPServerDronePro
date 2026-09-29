@@ -50,7 +50,7 @@ public class RTMPServer {
                     client.socket().setSendBufferSize(256 * 1024);
                     client.socket().setSoTimeout(15000);
                     connectionCount++;
-                    Log.i(TAG, "=== DJI CONNECTED ===");
+                    Log.i(TAG, "=== DRONE CONNECTED ===");
                     executorService.execute(() -> handleClient(client));
                 }
             } catch (Exception e) {
@@ -174,7 +174,7 @@ public class RTMPServer {
                                           ((completeBody[1] & 0xFF) << 16) |
                                           ((completeBody[2] & 0xFF) << 8)  |
                                           (completeBody[3] & 0xFF);
-                            Log.i(TAG, "→ DJI Chunk Size mis à jour : " + inChunkSize);
+                            Log.i(TAG, "DJI chunk size updated: " + inChunkSize);
                             break;
 
                         case 20:
@@ -190,7 +190,7 @@ public class RTMPServer {
                                 boolean isSequenceHeader = (completeBody[0] == 0x17 && completeBody[1] == 0x00);
                                 if (isSequenceHeader) {
                                     videoHeader = completeBody;
-                                    Log.i(TAG, "★★★ AVC CONFIG HEADER (SPS/PPS) REÇU (" + completeBody.length + " bytes) ★★★");
+                                    Log.i(TAG, "AVC config header (SPS/PPS) received (" + completeBody.length + " bytes) ★★★");
                                     if (!streamStarted) {
                                         streamStarted = true;
                                         callback.onStreamStarted(videoHeader, audioHeader != null ? audioHeader : new byte[0]);
@@ -205,7 +205,7 @@ public class RTMPServer {
                                 boolean isAudioSeqHeader = ((completeBody[0] & 0xF0) == 0xA0 && completeBody[1] == 0x00);
                                 if (isAudioSeqHeader) {
                                     audioHeader = completeBody;
-                                    Log.i(TAG, "★★★ AAC AUDIO HEADER REÇU ★★★");
+                                    Log.i(TAG, "AAC audio sequence header received");
                                 }
                                 callback.onStreamData(completeBody, 8, header.timestamp);
                             }
@@ -219,7 +219,7 @@ public class RTMPServer {
             try { channel.close(); } catch (Exception ignored) {}
             connectionCount--;
             callback.onStreamStopped();
-            Log.i(TAG, "=== DJI DISCONNECTED ===");
+            Log.i(TAG, "=== DRONE DISCONNECTED ===");
         }
     }
 
@@ -250,7 +250,7 @@ public class RTMPServer {
         }
         if (str.contains("publish") && !publishState[0]) {
             publishState[0] = true;
-            Log.i(TAG, "★★★ DJI PUBLISH RECEIVED -> STREAM IS LIVE! ★★★");
+            Log.i(TAG, "DJI publish received -> stream is live!");
             sendPublishResponse(out);
         }
     }

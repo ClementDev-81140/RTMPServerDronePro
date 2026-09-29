@@ -1,33 +1,131 @@
 <resources>
     <string name="app_name">RTMP Server Drone PRO</string>
-    <string name="add_channel">Ajouter Chaîne</string>
-    <string name="edit">Modifier</string>
-    <string name="delete">Supprimer</string>
-    <string name="duplicate">Dupliquer</string>
-    <string name="channel_name">Nom de la chaîne</string>
-    <string name="rtmp_url">URL RTMP/RTMPS</string>
-    <string name="stream_key">Clé de Stream</string>
-    <string name="quality">Qualité</string>
-    <string name="quality_low">Basse (720p 1Mbps)</string>
-    <string name="quality_medium">Moyenne (1080p 2.5Mbps)</string>
-    <string name="quality_high">Haute (1080p 4Mbps)</string>
-    <string name="primary_channel">Chaîne principale</string>
-    <string name="save">Enregistrer</string>
-    <string name="cancel">Annuler</string>
-    <string name="drone_port">Port Drone</string>
-    <string name="drone_url">URL pour le drone</string>
-    <string name="start_streaming">DÉMARRER</string>
-    <string name="stop_streaming">ARRÊTER</string>
-    <string name="active_channels">Chaînes actives: %d/3</string>
-    <string name="status_idle">En attente</string>
-    <string name="status_streaming">Streaming</string>
-    <string name="local_recording">Enregistrement local</string>
-    <string name="preview">Aperçu vidéo</string>
-    <string name="battery_saver">Mode économie batterie</string>
-    <string name="max_channels_reached">Maximum 3 chaînes actives simultanées</string>
-    <string name="channel_disconnected">Chaîne déconnectée: %s</string>
-    <string name="failover_activated">Basculement automatique activé</string>
-    <string name="confirm_delete">Supprimer cette chaîne?</string>
-    <string name="yes">Oui</string>
-    <string name="no">Non</string>
+    <string name="app_short_title">Drone Stream</string>
+
+    <!-- ============ Main screen ============ -->
+    <string name="status_offline">● OFFLINE</string>
+    <string name="status_waiting">● WAITING FOR DRONE</string>
+    <string name="status_live">● LIVE</string>
+
+    <string name="action_settings">Configuration</string>
+    <string name="action_fullscreen">Fullscreen</string>
+    <string name="no_signal">NO SIGNAL</string>
+    <string name="preview_battery_saver">PREVIEW OFF\nBATTERY SAVER</string>
+
+    <string name="start_server">START SERVER</string>
+    <string name="stop_server">STOP SERVER</string>
+
+    <string name="option_video_preview">Video Preview</string>
+    <string name="option_local_recording">Local Recording</string>
+    <string name="option_battery_saver">Battery Saver Mode</string>
+    <string name="battery_saver_hint">Video preview is paused to save CPU and battery. Streaming continues normally.</string>
+
+    <string name="section_destinations">Destinations</string>
+    <string name="active_count">%1$d/%2$d active</string>
+    <string name="action_add">+ Add</string>
+    <string name="max_active_channels">Maximum of 3 active destinations</string>
+    <string name="no_destinations">No destination yet.\nTap the + Add button to relay your drone feed to Telegram, YouTube, Facebook or Restream.</string>
+
+    <string name="drone_url_label">DRONE RTMP URL (Port: %1$d)</string>
+    <string name="stats_waiting">Waiting for the drone…</string>
+    <string name="stats_uptime">Uptime</string>
+
+    <string name="recording_indicator">● REC %1$s</string>
+    <string name="recording_started">Recording started: %1$s</string>
+    <string name="recording_saved">Recording saved: %1$s (%2$s)</string>
+    <string name="recording_failed">Recording failed: %1$s</string>
+
+    <string name="toast_preview_disabled">Video preview is paused in Battery Saver mode</string>
+    <string name="toast_service_not_ready">Service is not ready yet, please try again</string>
+    <string name="toast_no_active_channel">Enable at least one destination to relay the feed</string>
+
+    <!-- ============ Destination list ============ -->
+    <string name="channel_state_off">OFF</string>
+    <string name="channel_state_armed">ARMED • waiting for the drone</string>
+    <string name="channel_state_live">● LIVE • %1$d kbps • %2$d ms</string>
+    <string name="channel_state_connecting">● CONNECTING…</string>
+    <string name="channel_state_error">● ERROR</string>
+
+    <string name="dialog_delete_title">Delete destination</string>
+    <string name="dialog_delete_message">Remove &quot;%1$s&quot;?</string>
+    <string name="yes">Yes</string>
+    <string name="no">No</string>
+
+    <!-- ============ Destination settings ============ -->
+    <string name="channel_config_title">Destination Settings</string>
+    <string name="label_channel_name">Channel Name</string>
+    <string name="hint_channel_name">e.g. Telegram Live, YouTube</string>
+    <string name="label_rtmp_url">RTMP / RTMPS URL</string>
+    <string name="hint_rtmp_url">rtmps://dc4-1.rtmp.t.me/s/</string>
+    <string name="label_stream_key">Stream Key</string>
+    <string name="hint_stream_key">e.g. 123456789:ABCdef…</string>
+    <string name="label_primary">Primary Destination (Failover ⭐)</string>
+    <string name="desc_primary">Preferred destination used first, and kept alive on failover</string>
+    <string name="label_quality">Quality &amp; Target Bitrate</string>
+    <string name="quality_low">720p • 1.0 Mbps (low bandwidth)</string>
+    <string name="quality_medium">1080p • 2.5 Mbps (recommended)</string>
+    <string name="quality_high">1080p • 4.0 Mbps (high quality)</string>
+    <string name="action_cancel">Cancel</string>
+    <string name="action_save">Save</string>
+    <string name="channel_saved">Destination saved</string>
+    <string name="error_name_required">Please enter a channel name</string>
+    <string name="error_url_required">Please enter the RTMP/RTMPS URL</string>
+    <string name="error_url_invalid">The URL must start with rtmp:// or rtmps://</string>
+
+    <!-- ============ Configuration screen ============ -->
+    <string name="settings_title">Configuration</string>
+    <string name="settings_saved">Configuration saved</string>
+    <string name="action_restore_defaults">Restore defaults</string>
+    <string name="settings_defaults_restored">Default configuration restored</string>
+
+    <string name="settings_section_server">Server</string>
+    <string name="settings_port">RTMP port</string>
+    <string name="settings_port_hint">1935</string>
+    <string name="settings_path_hint">live</string>
+    <string name="settings_port_summary">Port the drone connects to (default: 1935)</string>
+    <string name="settings_path">Stream path</string>
+    <string name="settings_path_summary">Path at the end of the drone URL (default: live)</string>
+    <string name="settings_auto_start">Start the server when the app opens</string>
+    <string name="settings_auto_start_summary">The local RTMP server starts automatically, no need to press START SERVER</string>
+    <string name="settings_keep_screen_on">Keep the screen on while streaming</string>
+    <string name="settings_keep_screen_on_summary">Prevents the display from sleeping during a flight</string>
+
+    <string name="settings_section_defaults">Streaming defaults</string>
+    <string name="settings_default_preview">Video preview enabled by default</string>
+    <string name="settings_default_preview_summary">Shows the decoded drone feed on the main screen</string>
+    <string name="settings_default_recording">Local recording enabled by default</string>
+    <string name="settings_default_recording_summary">Saves an MP4 copy of the incoming stream on the phone</string>
+    <string name="settings_default_battery">Battery saver enabled by default</string>
+    <string name="settings_default_battery_summary">Starts every session in power saving mode</string>
+
+    <string name="settings_section_recording">Recording</string>
+    <string name="settings_public_recordings">Save recordings to the public Movies folder</string>
+    <string name="settings_public_recordings_summary">Recordings appear in the gallery/Media apps. Requires Android 10 or newer</string>
+    <string name="settings_recordings_folder">Recordings folder</string>
+    <string name="settings_recordings_stats">%1$d file(s) • %2$s</string>
+
+    <string name="settings_section_battery">Battery saver</string>
+    <string name="settings_battery_disable_preview">Battery saver pauses the video preview</string>
+    <string name="settings_battery_disable_preview_summary">Disables hardware decoding while streaming, keeping only the relay to your destinations</string>
+    <string name="settings_battery_details">Battery saver also slows down the statistics refresh to 3 seconds and keeps the notification text short. The relay itself keeps running at full quality.</string>
+
+    <string name="settings_section_about">About</string>
+    <string name="settings_about_version">Version %1$s</string>
+    <string name="settings_about_text">Local RTMP server (port 1935) that receives the drone feed and relays it to your destinations. Nothing is uploaded anywhere except to the destinations you enable.</string>
+
+    <string name="settings_error_port">Port must be between 1024 and 65535</string>
+    <string name="settings_error_path">Stream path cannot be empty</string>
+    <!-- ============ Service / notifications ============ -->
+    <string name="notification_idle">Local RTMP server ready</string>
+    <string name="notification_waiting">Listening on port %1$d — waiting for the drone</string>
+    <string name="notification_live">Relaying the drone feed to %1$d destination(s)</string>
+    <string name="notification_battery_saver">battery saver</string>
+    <string name="error_server_start">Cannot start the RTMP server: %1$s</string>
+    <string name="recording_indicator_armed">● REC armed</string>
+
+    <!-- ============ Misc ============ -->
+    <string name="settings_public_unavailable">Public Movies folder requires Android 10 or newer — recordings are stored in the app folder on this device.</string>
+    <string name="settings_recording_format">Each recording is a MP4 file (H.264 + AAC, no re-encoding). The file is finalised automatically when the drone disconnects.</string>
+    <string name="preview_hint_battery_saver">Battery saver pauses the video preview. Turn it off to see the drone feed again.</string>
+    <string name="toast_no_recording">Local recording is off</string>
 </resources>
