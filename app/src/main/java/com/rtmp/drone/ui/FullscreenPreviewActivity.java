@@ -76,8 +76,11 @@ public class FullscreenPreviewActivity extends AppCompatActivity {
             public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {}
             @Override
             public void surfaceDestroyed(SurfaceHolder holder) {
-                // Deliberately keeps the surface: the main screen re-attaches its own surface
-                // in onResume(), which avoids a black preview when coming back from fullscreen.
+                // Detach the surface so the decoder stops instead of failing on a dead
+                // surface; the main screen re-attaches its own surface when it comes back.
+                if (serviceBound && streamService != null) {
+                    streamService.setPreviewSurface(null);
+                }
             }
         });
 

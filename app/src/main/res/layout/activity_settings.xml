@@ -254,6 +254,32 @@
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
+            <!-- ============ SECURITY ============ -->
+            <TextView
+                style="@style/SectionTitle"
+                android:text="@string/settings_section_security"/>
+
+            <com.google.android.material.card.MaterialCardView style="@style/SettingsCard">
+
+                <LinearLayout style="@style/SettingsCardContent">
+
+                    <LinearLayout style="@style/SwitchRow">
+                        <LinearLayout style="@style/SwitchRowTexts">
+                            <TextView
+                                style="@style/SwitchTitle"
+                                android:text="@string/settings_strict_tls"/>
+                            <TextView
+                                style="@style/FieldSummary"
+                                android:text="@string/settings_strict_tls_summary"/>
+                        </LinearLayout>
+                        <com.google.android.material.switchmaterial.SwitchMaterial
+                            android:id="@+id/switchStrictTls"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"/>
+                    </LinearLayout>
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
             <!-- ============ ABOUT ============ -->
             <TextView
                 style="@style/SectionTitle"

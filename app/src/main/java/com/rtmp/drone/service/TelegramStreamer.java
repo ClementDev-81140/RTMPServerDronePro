@@ -16,6 +16,8 @@ import java.util.concurrent.atomic.*;
 public class TelegramStreamer {
     private static final String TAG = "TelegramStreamer";
     private static final int CHUNK_SIZE = 4096;
+    private static final int EXTENDED_TIMESTAMP = 0xFFFFFF;
+    private static final int SEND_QUEUE_CAPACITY = 300;
 
     private static final byte[] AAC_SEQ_HEADER = new byte[]{(byte) 0xAF, 0x00, 0x12, 0x10};
     private byte[] aacSilenceTagBody;
@@ -38,18 +40,70 @@ public class TelegramStreamer {
 
     private byte[] cachedVideoHeader;
     private byte[] cachedAudioHeader;
-    
+
     private long djiTimestampOffset = -1;
     private long lastAudioTimestamp = 0;
-    
+
     private ScheduledExecutorService logExecutor;
     private ExecutorService networkReaderExecutor;
+
+    /** Outgoing messages are queued and written by a dedicated thread: one slow destination
+     *  must never block the RTMP reader (and therefore the other destinations). */
+    private final ArrayBlockingQueue<Packet> sendQueue = new ArrayBlockingQueue<>(SEND_QUEUE_CAPACITY);
+    private Thread writerThread;
+    private volatile boolean writerRunning = false;
+    private final AtomicLong droppedPackets = new AtomicLong(0);
+
+    private volatile boolean strictTls = true;
+    private volatile int videoWidth = 1280;
+    private volatile int videoHeight = 720;
+    private volatile String lastError;
+    private volatile Runnable errorListener;
+
+    /** A ready to send RTMP message (timestamp already converted by sendData). */
+    private static class Packet {
+        final int csid;
+        final int messageType;
+        final int streamId;
+        final int timestamp;
+        final byte[] payload;
+
+        Packet(int csid, int messageType, int streamId, int timestamp, byte[] payload) {
+            this.csid = csid;
+            this.messageType = messageType;
+            this.streamId = streamId;
+            this.timestamp = timestamp;
+            this.payload = payload;
+        }
+    }
 
     public TelegramStreamer(String url, String streamKey, int targetBitrate) {
         this.url = url;
         this.streamKey = streamKey;
         this.targetBitrate = targetBitrate;
         this.aacSilenceTagBody = generateHardwareAacSilence();
+    }
+
+    /** Called when the connection breaks or a write fails, so the service can retry. */
+    public void setErrorListener(Runnable listener) {
+        this.errorListener = listener;
+    }
+
+    public String getLastError() {
+        return lastError;
+    }
+
+    /** Real drone resolution, used for the onMetaData sent to the server. */
+    public void setVideoSize(int width, int height) {
+        if (width > 0 && height > 0) {
+            this.videoWidth = width;
+            this.videoHeight = height;
+        }
+    }
+
+    /** When true (default) the TLS certificate of the destination must be valid. */
+    public void setStrictTls(boolean strict) {
+        this.strictTls = strict;
     }
 
     private byte[] generateHardwareAacSilence() {
@@ -137,11 +191,19 @@ public class TelegramStreamer {
 
         if (isRtmps) {
             SSLContext sslContext = SSLContext.getInstance("TLS");
-            sslContext.init(null, new TrustManager[]{new X509TrustManager() {
-                public void checkClientTrusted(X509Certificate[] chain, String authType) {}
-                public void checkServerTrusted(X509Certificate[] chain, String authType) {}
-                public X509Certificate[] getAcceptedIssuers() { return new X509Certificate[0]; }
-            }}, new java.security.SecureRandom());
+            TrustManager[] trustManagers;
+            if (strictTls) {
+                // Default platform validation: the destination certificate must be trusted.
+                trustManagers = null;
+            } else {
+                Log.w(TAG, "Strict TLS disabled for " + host + ": the certificate is not verified");
+                trustManagers = new TrustManager[]{new X509TrustManager() {
+                    public void checkClientTrusted(X509Certificate[] chain, String authType) {}
+                    public void checkServerTrusted(X509Certificate[] chain, String authType) {}
+                    public X509Certificate[] getAcceptedIssuers() { return new X509Certificate[0]; }
+                }};
+            }
+            sslContext.init(null, trustManagers, new java.security.SecureRandom());
 
             SSLSocket sslSocket = (SSLSocket) sslContext.getSocketFactory().createSocket();
             try {
@@ -208,6 +270,7 @@ public class TelegramStreamer {
         }
 
         startIncomingPacketConsumer();
+        startWriter();
         startStatsLogger();
 
         Log.i(TAG, "=== DESTINATION IS NOW LIVE ===");
@@ -237,10 +300,20 @@ public class TelegramStreamer {
             byte[] buf = new byte[4096];
             try {
                 while (streaming && in != null) {
-                    int r = in.read(buf);
+                    int r;
+                    try {
+                        r = in.read(buf);
+                    } catch (SocketTimeoutException timeout) {
+                        // Nothing to read: keep the socket drained instead of abandoning it.
+                        continue;
+                    }
                     if (r <= 0) break;
+                    // Server packets are deliberately discarded: the socket only has to be
+                    // drained so that its receive window never fills up and blocks our writes.
                 }
-            } catch (Exception ignored) {}
+            } catch (Exception ignored) {
+            }
+            if (streaming) fail("Connection closed by the server");
         });
     }
 
@@ -328,8 +401,8 @@ public class TelegramStreamer {
         amf.write(0x08);
         amf.write(new byte[]{0, 0, 0, 8});
 
-        writeAMF0Prop(amf, "width", 1280.0);
-        writeAMF0Prop(amf, "height", 720.0);
+        writeAMF0Prop(amf, "width", (double) videoWidth);
+        writeAMF0Prop(amf, "height", (double) videoHeight);
         writeAMF0Prop(amf, "videocodecid", 7.0);
         writeAMF0Prop(amf, "videodatarate", (double)(targetBitrate > 0 ? targetBitrate / 1000 : 2500));
         writeAMF0Prop(amf, "framerate", 30.0);
@@ -350,8 +423,12 @@ public class TelegramStreamer {
         }, 3, 3, TimeUnit.SECONDS);
     }
 
+    /**
+     * Called from the RTMP reader thread for every video/audio message of the drone.
+     * The message is only queued here: a slow network must never block the reader.
+     */
     public synchronized void sendData(byte[] data, int type, int djiTimestamp) {
-        if (!streaming || data == null || data.length == 0 || out == null) return;
+        if (!streaming || data == null || data.length == 0) return;
 
         try {
             if (djiTimestampOffset == -1) {
@@ -362,42 +439,91 @@ public class TelegramStreamer {
             int relativeTimestamp = (int) (djiTimestamp - djiTimestampOffset);
             if (relativeTimestamp < 0) relativeTimestamp = 0;
 
-            int csid = (type == 9) ? 4 : (type == 8 ? 5 : 6);
-            int streamId = 1;
-
             if (type == 8) {
                 droneHasAudio = true;
-                audioFramesSent.incrementAndGet();
-                sendRtmpPacket(csid, type, streamId, relativeTimestamp, data);
+                enqueue(new Packet(5, 0x08, 1, relativeTimestamp, data), false);
             } else if (type == 9) {
-                videoFramesSent.incrementAndGet();
                 lastFrameTime = System.currentTimeMillis();
 
+                // When the drone has no audio, a silent AAC track keeps the destination happy.
                 if (!droneHasAudio && aacSilenceTagBody != null) {
-                    while (lastAudioTimestamp + 23 < relativeTimestamp) {
+                    int guard = 0;
+                    while (lastAudioTimestamp + 23 < relativeTimestamp && guard++ < 100) {
                         lastAudioTimestamp += 23;
-                        sendRtmpPacket(5, 0x08, 1, (int) lastAudioTimestamp, aacSilenceTagBody);
-                        audioFramesSent.incrementAndGet();
+                        if (!enqueue(new Packet(5, 0x08, 1, (int) lastAudioTimestamp, aacSilenceTagBody), true)) break;
                     }
                 }
 
-                sendRtmpPacket(csid, type, streamId, relativeTimestamp, data);
+                enqueue(new Packet(4, 0x09, 1, relativeTimestamp, data), false);
             }
-            bytesSent.addAndGet(data.length);
         } catch (Exception e) {
             Log.e(TAG, "Send error: " + e.getMessage());
-            stop();
+            fail(e.getMessage());
         }
+    }
+
+    /**
+     * @param disposable when true the packet may be silently dropped if the queue is full
+     *                   (used for the generated silence frames)
+     * @return true when the packet was queued
+     */
+    private boolean enqueue(Packet packet, boolean disposable) {
+        if (sendQueue.offer(packet)) return true;
+        if (disposable) {
+            droppedPackets.incrementAndGet();
+            return false;
+        }
+        // Live data: drop the oldest queued packet to keep the newest frame.
+        Packet dropped = sendQueue.poll();
+        if (dropped != null) droppedPackets.incrementAndGet();
+        if (sendQueue.offer(packet)) return true;
+        droppedPackets.incrementAndGet();
+        return false;
+    }
+
+    private void startWriter() {
+        writerRunning = true;
+        writerThread = new Thread(() -> {
+            while (writerRunning) {
+                try {
+                    Packet packet = sendQueue.poll(200, TimeUnit.MILLISECONDS);
+                    if (packet == null) continue;
+                    sendRtmpPacket(packet.csid, packet.messageType, packet.streamId, packet.timestamp, packet.payload);
+                    bytesSent.addAndGet(packet.payload.length);
+                    if (packet.messageType == 0x09) videoFramesSent.incrementAndGet();
+                    else if (packet.messageType == 0x08) audioFramesSent.incrementAndGet();
+                } catch (InterruptedException e) {
+                    // stop() requested
+                } catch (Exception e) {
+                    Log.e(TAG, "Write error: " + e.getMessage());
+                    fail(e.getMessage());
+                    break;
+                }
+            }
+            sendQueue.clear();
+        }, "rtmp-sender");
+        writerThread.start();
+    }
+
+    private void fail(String reason) {
+        if (!streaming) return;
+        lastError = (reason != null) ? reason : "Connection lost";
+        Log.e(TAG, "Destination lost: " + lastError);
+        streaming = false;
+        Runnable listener = errorListener;
+        if (listener != null) listener.run();
     }
 
     private synchronized void sendRtmpPacket(int csid, int msgType, int streamId, int timestamp, byte[] payload) throws IOException {
         int length = payload.length;
+        boolean extendedTimestamp = timestamp > EXTENDED_TIMESTAMP;
+        int headerTimestamp = extendedTimestamp ? EXTENDED_TIMESTAMP : timestamp;
 
         ByteArrayOutputStream chunk = new ByteArrayOutputStream();
         chunk.write((csid & 0x3F));
-        chunk.write((timestamp >> 16) & 0xFF);
-        chunk.write((timestamp >> 8) & 0xFF);
-        chunk.write(timestamp & 0xFF);
+        chunk.write((headerTimestamp >> 16) & 0xFF);
+        chunk.write((headerTimestamp >> 8) & 0xFF);
+        chunk.write(headerTimestamp & 0xFF);
         chunk.write((length >> 16) & 0xFF);
         chunk.write((length >> 8) & 0xFF);
         chunk.write(length & 0xFF);
@@ -406,6 +532,14 @@ public class TelegramStreamer {
         chunk.write((streamId >> 8) & 0xFF);
         chunk.write((streamId >> 16) & 0xFF);
         chunk.write((streamId >> 24) & 0xFF);
+        if (extendedTimestamp) {
+            // The 4 bytes of the extended timestamp follow the type-0 header, and every
+            // continuation chunk carries them again.
+            chunk.write((timestamp >> 24) & 0xFF);
+            chunk.write((timestamp >> 16) & 0xFF);
+            chunk.write((timestamp >> 8) & 0xFF);
+            chunk.write(timestamp & 0xFF);
+        }
 
         int pos = 0;
         int firstChunk = Math.min(length, CHUNK_SIZE);
@@ -416,7 +550,13 @@ public class TelegramStreamer {
 
         while (pos < length) {
             int chunkSize = Math.min(length - pos, CHUNK_SIZE);
-            out.write(0xC0 | (csid & 0x3F));
+            out.write(0xC3 | (csid & 0x3F));
+            if (extendedTimestamp) {
+                out.write((timestamp >> 24) & 0xFF);
+                out.write((timestamp >> 16) & 0xFF);
+                out.write((timestamp >> 8) & 0xFF);
+                out.write(timestamp & 0xFF);
+            }
             out.write(payload, pos, chunkSize);
             pos += chunkSize;
         }
@@ -463,6 +603,8 @@ public class TelegramStreamer {
 
     public void stop() {
         streaming = false;
+        writerRunning = false;
+        if (writerThread != null) writerThread.interrupt();
         if (logExecutor != null) logExecutor.shutdownNow();
         if (networkReaderExecutor != null) networkReaderExecutor.shutdownNow();
         try {
@@ -481,4 +623,5 @@ public class TelegramStreamer {
         return (int)((bytesSent.get() * 8) / duration / 1000);
     }
     public int getLatency() { return (int)(System.currentTimeMillis() - lastFrameTime); }
+    public long getDroppedPackets() { return droppedPackets.get(); }
 }

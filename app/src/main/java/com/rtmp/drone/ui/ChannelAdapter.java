@@ -18,6 +18,8 @@ public class ChannelAdapter extends RecyclerView.Adapter<ChannelAdapter.ViewHold
     private final ChannelListener listener;
     /** Live statistics coming from the service, keyed by channel id. */
     private final Map<Integer, ChannelStats> stats = new HashMap<>();
+    /** Last statistics actually drawn, used to skip useless redraws. */
+    private final Map<Integer, ChannelStats> displayedStats = new HashMap<>();
 
     public interface ChannelListener {
         void onEdit(StreamChannel channel);
@@ -36,6 +38,7 @@ public class ChannelAdapter extends RecyclerView.Adapter<ChannelAdapter.ViewHold
 
     public void updateChannels(List<StreamChannel> newChannels) {
         this.channels = new ArrayList<>(newChannels);
+        displayedStats.clear();
         notifyDataSetChanged();
     }
 
@@ -49,15 +52,38 @@ public class ChannelAdapter extends RecyclerView.Adapter<ChannelAdapter.ViewHold
         }
     }
 
-    /** Applies the runtime statistics published by the service. */
+    /**
+     * Applies the runtime statistics published by the service.
+     * Only the rows whose values really changed are redrawn: a full refresh every second
+     * would interrupt the switch animations and the taps of the user.
+     */
     public void applyStats(Map<Integer, ChannelStats> snapshot) {
+        Map<Integer, ChannelStats> incoming = (snapshot == null) ? new HashMap<>() : snapshot;
         stats.clear();
-        if (snapshot != null) stats.putAll(snapshot);
-        notifyDataSetChanged();
+        stats.putAll(incoming);
+        for (int i = 0; i < channels.size(); i++) {
+            StreamChannel channel = channels.get(i);
+            if (statsChanged(channel.id, incoming.get(channel.id))) {
+                notifyItemChanged(i);
+            }
+        }
+    }
+
+    private boolean statsChanged(int channelId, ChannelStats fresh) {
+        ChannelStats previous = displayedStats.get(channelId);
+        if (previous == null && fresh == null) return false;
+        if (previous == null || fresh == null) return true;
+        boolean changed = previous.connected != fresh.connected
+                || previous.error != fresh.error
+                || previous.bitrateKbps != fresh.bitrateKbps
+                || previous.latencyMs != fresh.latencyMs;
+        if (changed) displayedStats.put(channelId, fresh);
+        return changed;
     }
 
     public void clearStats() {
         stats.clear();
+        displayedStats.clear();
         notifyDataSetChanged();
     }
 

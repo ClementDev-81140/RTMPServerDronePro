@@ -31,6 +31,7 @@ public class MainActivity extends AppCompatActivity
     private static final int REQUEST_SETTINGS = 101;
     private static final int REQUEST_NOTIFICATIONS = 102;
     private static final int MAX_ACTIVE_CHANNELS = 3;
+    private static final int NO_CHANNEL_ID = -1;
 
     private TextView tvStatus, tvActiveChannels, tvDroneUrl, tvDroneUrlLabel, tvGlobalStats;
     private TextView tvPreviewPlaceholder, tvRecordingIndicator, tvBatteryHint, tvEmptyChannels;
@@ -52,6 +53,8 @@ public class MainActivity extends AppCompatActivity
     private boolean serviceBound = false;
     private boolean applyDefaultsOnResume = true;
     private boolean autoStartAttempted = false;
+    /** Channel currently edited, so its changes can be pushed to a running session. */
+    private int editedChannelId = NO_CHANNEL_ID;
     private boolean updatingSwitches = false;
     private boolean batterySaverActive = false;
     private boolean droneSignalActive = false;
@@ -78,6 +81,7 @@ public class MainActivity extends AppCompatActivity
             serviceBound = false;
             streamService = null;
             stopStatsUpdate();
+            adapter.clearStats();
             updateUIState(false, false);
         }
     };
@@ -376,11 +380,13 @@ public class MainActivity extends AppCompatActivity
     }
 
     private void addChannel() {
+        editedChannelId = NO_CHANNEL_ID;
         startActivityForResult(new Intent(this, ChannelConfigActivity.class), REQUEST_CHANNEL_CONFIG);
     }
 
     @Override
     public void onEdit(StreamChannel channel) {
+        editedChannelId = channel.id;
         Intent intent = new Intent(this, ChannelConfigActivity.class);
         intent.putExtra(ChannelConfigActivity.EXTRA_CHANNEL_ID, channel.id);
         startActivityForResult(intent, REQUEST_CHANNEL_CONFIG);
@@ -660,7 +666,17 @@ public class MainActivity extends AppCompatActivity
 
     @Override
     public void onStreamError(String message) {
-        runOnUiThread(() -> Toast.makeText(this, message, Toast.LENGTH_LONG).show());
+        runOnUiThread(() -> {
+            Toast.makeText(this, message, Toast.LENGTH_LONG).show();
+            // The service gave up (server could not start): do not stay in "WAITING FOR DRONE".
+            droneSignalActive = false;
+            updateUIState(false, false);
+            stopStatsUpdate();
+            adapter.clearStats();
+            tvRecordingIndicator.setVisibility(View.GONE);
+            tvPreviewPlaceholder.setText(R.string.no_signal);
+            tvPreviewPlaceholder.setVisibility(switchPreview.isChecked() ? View.VISIBLE : View.GONE);
+        });
     }
 
     // ------------------------------------------------------------------ results
@@ -671,6 +687,15 @@ public class MainActivity extends AppCompatActivity
         if (requestCode == REQUEST_SETTINGS) {
             applyDefaultsOnResume = true;
         }
+        if (requestCode == REQUEST_CHANNEL_CONFIG && resultCode == ChannelConfigActivity.RESULT_SAVED
+                && editedChannelId != NO_CHANNEL_ID && isStreaming()) {
+            // The destination was edited while the session is running: apply it right away.
+            StreamChannel updated = db.channelDao().getChannelById(editedChannelId);
+            if (updated != null) {
+                streamService.refreshChannel(updated);
+            }
+        }
+        editedChannelId = NO_CHANNEL_ID;
         loadChannels();
     }
 

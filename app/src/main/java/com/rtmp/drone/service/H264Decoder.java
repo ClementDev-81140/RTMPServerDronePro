@@ -23,6 +23,7 @@ public class H264Decoder {
     private boolean isConfigured = false;
     private byte[] cachedHeader = null;
     private boolean enabled = true;
+    private long droppedFrames = 0;
 
     public H264Decoder() {}
 
@@ -137,15 +138,27 @@ public class H264Decoder {
     }
 
     private void feedMediaCodec(byte[] nalu) {
+        if (!isConfigured || mediaCodec == null) return;
         try {
-            int inIndex = mediaCodec.dequeueInputBuffer(10000);
+            // Never wait for an input buffer: the preview is the least important consumer of
+            // the stream and must not slow down the relay nor the local recording.
+            int inIndex = mediaCodec.dequeueInputBuffer(0);
             if (inIndex >= 0) {
                 ByteBuffer inputBuffer = mediaCodec.getInputBuffer(inIndex);
                 if (inputBuffer != null) {
                     inputBuffer.clear();
-                    inputBuffer.put(nalu);
-                    mediaCodec.queueInputBuffer(inIndex, 0, nalu.length, System.nanoTime() / 1000, 0);
+                    if (inputBuffer.capacity() >= nalu.length) {
+                        inputBuffer.put(nalu);
+                        mediaCodec.queueInputBuffer(inIndex, 0, nalu.length, System.nanoTime() / 1000, 0);
+                    } else {
+                        // Frame bigger than the codec buffer (unusual resolution): give the
+                        // buffer back instead of throwing, the next frames are unaffected.
+                        mediaCodec.queueInputBuffer(inIndex, 0, 0, System.nanoTime() / 1000, 0);
+                        droppedFrames++;
+                    }
                 }
+            } else {
+                droppedFrames++;
             }
 
             MediaCodec.BufferInfo info = new MediaCodec.BufferInfo();
@@ -155,8 +168,15 @@ public class H264Decoder {
                 outIndex = mediaCodec.dequeueOutputBuffer(info, 0);
             }
         } catch (Exception e) {
+            // A dead surface (fullscreen preview closed) makes every call fail: stop the
+            // codec here and let the next setSurface() re-initialise it.
             Log.e(TAG, "Decode error: " + e.getMessage());
+            stop();
         }
+    }
+
+    public long getDroppedFrames() {
+        return droppedFrames;
     }
 
     public synchronized void stop() {

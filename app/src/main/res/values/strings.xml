@@ -75,6 +75,7 @@
     <!-- ============ Configuration screen ============ -->
     <string name="settings_title">Configuration</string>
     <string name="settings_saved">Configuration saved</string>
+    <string name="settings_restart_needed">Port and stream path will apply on the next START SERVER</string>
     <string name="action_restore_defaults">Restore defaults</string>
     <string name="settings_defaults_restored">Default configuration restored</string>
 
@@ -108,6 +109,10 @@
     <string name="settings_battery_disable_preview">Battery saver pauses the video preview</string>
     <string name="settings_battery_disable_preview_summary">Disables hardware decoding while streaming, keeping only the relay to your destinations</string>
     <string name="settings_battery_details">Battery saver also slows down the statistics refresh to 3 seconds and keeps the notification text short. The relay itself keeps running at full quality.</string>
+
+    <string name="settings_section_security">Security</string>
+    <string name="settings_strict_tls">Verify TLS certificates of rtmps:// destinations</string>
+    <string name="settings_strict_tls_summary">Recommended. Turn it off only if a destination uses a self-signed certificate (the connection then cannot be trusted).</string>
 
     <string name="settings_section_about">About</string>
     <string name="settings_about_version">Version %1$s</string>

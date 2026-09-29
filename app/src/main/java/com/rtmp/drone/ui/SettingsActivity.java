@@ -19,7 +19,7 @@ public class SettingsActivity extends AppCompatActivity {
     private EditText editPort, editPath;
     private SwitchMaterial switchAutoStart, switchKeepScreenOn;
     private SwitchMaterial switchDefaultPreview, switchDefaultRecording, switchDefaultBattery;
-    private SwitchMaterial switchPublicRecordings, switchBatteryDisablesPreview;
+    private SwitchMaterial switchPublicRecordings, switchBatteryDisablesPreview, switchStrictTls;
     private TextView textViewPublicWarning, textViewRecordingsPath, textViewRecordingsStats, textViewVersion;
     private Button buttonRestoreDefaults, buttonCancel, buttonSave;
 
@@ -45,6 +45,7 @@ public class SettingsActivity extends AppCompatActivity {
         switchDefaultBattery = findViewById(R.id.switchDefaultBattery);
         switchPublicRecordings = findViewById(R.id.switchPublicRecordings);
         switchBatteryDisablesPreview = findViewById(R.id.switchBatteryDisablesPreview);
+        switchStrictTls = findViewById(R.id.switchStrictTls);
         textViewPublicWarning = findViewById(R.id.textViewPublicWarning);
         textViewRecordingsPath = findViewById(R.id.textViewRecordingsPath);
         textViewRecordingsStats = findViewById(R.id.textViewRecordingsStats);
@@ -60,6 +61,7 @@ public class SettingsActivity extends AppCompatActivity {
         styleSwitch(switchDefaultBattery, "#00F593");
         styleSwitch(switchPublicRecordings, "#00D4FF");
         styleSwitch(switchBatteryDisablesPreview, "#00F593");
+        styleSwitch(switchStrictTls, "#6C5CE7");
 
         findViewById(R.id.buttonBack).setOnClickListener(v -> finish());
         buttonCancel.setOnClickListener(v -> finish());
@@ -107,6 +109,7 @@ public class SettingsActivity extends AppCompatActivity {
         switchDefaultRecording.setChecked(preferences.isDefaultRecordingEnabled());
         switchDefaultBattery.setChecked(preferences.isDefaultBatterySaverEnabled());
         switchBatteryDisablesPreview.setChecked(preferences.isBatterySaverPausesPreview());
+        switchStrictTls.setChecked(preferences.isStrictTlsEnabled());
 
         boolean publicSupported = LocalRecorder.isPublicStorageSupported();
         switchPublicRecordings.setEnabled(publicSupported);
@@ -148,6 +151,9 @@ public class SettingsActivity extends AppCompatActivity {
             return;
         }
 
+        boolean serverSettingsChanged = (port != preferences.getDronePort())
+                || !path.equals(preferences.getStreamPath());
+
         preferences.setDronePort(port);
         preferences.setStreamPath(path);
         preferences.setAutoStartServer(switchAutoStart.isChecked());
@@ -157,8 +163,13 @@ public class SettingsActivity extends AppCompatActivity {
         preferences.setDefaultBatterySaver(switchDefaultBattery.isChecked());
         preferences.setPublicRecordings(switchPublicRecordings.isChecked());
         preferences.setBatterySaverPausesPreview(switchBatteryDisablesPreview.isChecked());
+        preferences.setStrictTls(switchStrictTls.isChecked());
 
         Toast.makeText(this, R.string.settings_saved, Toast.LENGTH_SHORT).show();
+        if (serverSettingsChanged) {
+            // The server currently listening keeps its port until the next START SERVER.
+            Toast.makeText(this, R.string.settings_restart_needed, Toast.LENGTH_LONG).show();
+        }
         setResult(RESULT_OK);
         finish();
     }

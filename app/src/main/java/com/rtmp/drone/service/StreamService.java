@@ -23,6 +23,7 @@ import java.util.concurrent.*;
 public class StreamService extends Service implements RTMPServer.StreamCallback, LocalRecorder.Listener {
     private static final String TAG = "StreamService";
     private static final int NOTIFICATION_ID = 1001;
+    private static final int MAX_RETRY_ATTEMPTS = 6;
 
     private final IBinder binder = new LocalBinder();
     private RTMPServer rtmpServer;
@@ -46,8 +47,14 @@ public class StreamService extends Service implements RTMPServer.StreamCallback,
     private volatile long sessionStartMs = 0;
     private volatile byte[] cachedVideoHeader;
     private volatile byte[] cachedAudioHeader;
+    private volatile int[] videoSize;
     private volatile String lastRecordingName;
     private volatile String lastRecordingLocation;
+    private final Map<Integer, Integer> retryAttempts = new ConcurrentHashMap<>();
+    /** Destinations whose connection is being established (avoids two parallel attempts). */
+    private final Set<Integer> connectingChannels = Collections.newSetFromMap(new ConcurrentHashMap<Integer, Boolean>());
+    /** Bumped when a destination is removed/edited, so a stale connection is discarded. */
+    private final Map<Integer, Integer> channelGenerations = new ConcurrentHashMap<>();
 
     public interface StreamSignalListener {
         void onDroneSignalReceived();
@@ -130,6 +137,7 @@ public class StreamService extends Service implements RTMPServer.StreamCallback,
             }
         }
         failedChannels.clear();
+        retryAttempts.clear();
         this.isStreaming = true;
         this.isDroneSignalActive = false;
         this.sessionStartMs = System.currentTimeMillis();
@@ -149,7 +157,12 @@ public class StreamService extends Service implements RTMPServer.StreamCallback,
                 mainHandler.post(this::updateNotification);
             } catch (Exception e) {
                 Log.e(TAG, "Cannot start the RTMP server: " + e.getMessage());
-                notifyStreamError(getString(R.string.error_server_start, e.getMessage() == null ? "" : e.getMessage()));
+                String reason = (e.getMessage() == null) ? "" : e.getMessage();
+                mainHandler.post(() -> {
+                    // No server: end the session instead of leaving the UI "waiting for drone".
+                    release(true);
+                    notifyStreamError(getString(R.string.error_server_start, reason));
+                });
             }
         });
     }
@@ -158,12 +171,63 @@ public class StreamService extends Service implements RTMPServer.StreamCallback,
         release(true);
     }
 
+    /**
+     * Retries the destinations that failed to connect, with a growing delay
+     * (5 s, 10 s, 20 s, capped at 30 s) and at most {@link #MAX_RETRY_ATTEMPTS} tries each.
+     */
+    private void scheduleRetry() {
+        if (!isStreaming || !isDroneSignalActive) return;
+        boolean pending = false;
+        int smallestAttempt = Integer.MAX_VALUE;
+        for (StreamChannel channel : channels) {
+            if (!channel.isActive || streamers.containsKey(channel.id)) continue;
+            Integer stored = retryAttempts.get(channel.id);
+            int attempts = (stored == null) ? 0 : stored;
+            if (attempts < MAX_RETRY_ATTEMPTS) {
+                pending = true;
+                smallestAttempt = Math.min(smallestAttempt, attempts);
+            }
+        }
+        if (!pending) return;
+        long delay = Math.min(30000L, 5000L * (1L << Math.min(smallestAttempt, 3)));
+        mainHandler.removeCallbacks(retryRunnable);
+        mainHandler.postDelayed(retryRunnable, delay);
+        Log.i(TAG, "Next destination retry in " + (delay / 1000) + " s");
+    }
+
+    private final Runnable retryRunnable = () -> {
+        if (!isStreaming || !isDroneSignalActive) return;
+        boolean retried = false;
+        for (StreamChannel channel : channels) {
+            if (!channel.isActive || streamers.containsKey(channel.id)) continue;
+            Integer stored = retryAttempts.get(channel.id);
+            int attempts = (stored == null) ? 0 : stored;
+            if (attempts >= MAX_RETRY_ATTEMPTS) continue;
+            retryAttempts.put(channel.id, attempts + 1);
+            Log.i(TAG, "Reconnecting " + channel.name + " (attempt " + (attempts + 1) + "/" + MAX_RETRY_ATTEMPTS + ")");
+            connectDestination(channel);
+            retried = true;
+        }
+        if (retried) scheduleRetry();
+    };
+
+    private void cancelRetry() {
+        mainHandler.removeCallbacks(retryRunnable);
+    }
+
     private void release(boolean stopService) {
         isStreaming = false;
         isDroneSignalActive = false;
         cachedVideoHeader = null;
         cachedAudioHeader = null;
+        videoSize = null;
+        sessionStartMs = 0;
 
+        cancelRetry();
+        retryAttempts.clear();
+        for (StreamChannel channel : channels) {
+            channelGenerations.put(channel.id, generationOf(channel.id) + 1);
+        }
         stopRecorderNow();
 
         if (rtmpServer != null) {
@@ -305,6 +369,14 @@ public class StreamService extends Service implements RTMPServer.StreamCallback,
             current = new LocalRecorder(this, this, usePublicStorage);
             recorder = current;
             current.start();
+
+            // The drone only sends its SPS/PPS at the beginning of a session: when the
+            // recording is enabled in the middle of one, feed the cached headers so the
+            // file starts without waiting for the next flight.
+            byte[] videoHeader = cachedVideoHeader;
+            if (videoHeader != null) current.writeVideo(videoHeader, 0);
+            byte[] audioHeader = cachedAudioHeader;
+            if (audioHeader != null) current.writeAudio(audioHeader, 0);
         }
     }
 
@@ -356,25 +428,65 @@ public class StreamService extends Service implements RTMPServer.StreamCallback,
 
     // ------------------------------------------------------------- destinations
 
+    private int generationOf(int channelId) {
+        Integer generation = channelGenerations.get(channelId);
+        return (generation == null) ? 0 : generation;
+    }
+
     private void connectDestination(StreamChannel channel) {
         final StreamChannel target = channel.databaseCopy();
+        if (!connectingChannels.add(target.id)) {
+            Log.i(TAG, "Connection to " + target.name + " already in progress, skipping");
+            return;
+        }
+        final int generation = generationOf(target.id);
         executor.execute(() -> {
+            TelegramStreamer streamer = null;
             try {
                 Log.i(TAG, "Connecting destination " + target.name + " (" + target.getUrl() + ")");
-                TelegramStreamer streamer = new TelegramStreamer(target.getUrl(), target.streamKey, target.targetBitrate);
+                final TelegramStreamer created =
+                        new TelegramStreamer(target.getUrl(), target.streamKey, target.targetBitrate);
+                streamer = created;
+
+                int[] size = videoSize;
+                if (size != null) created.setVideoSize(size[0], size[1]);
+                created.setStrictTls(preferences == null || preferences.isStrictTlsEnabled());
+                created.setErrorListener(() -> {
+                    // The connection died mid stream: close it cleanly, flag the destination
+                    // and let the retry loop try again.
+                    created.stop();
+                    streamers.remove(target.id, created);
+                    failedChannels.add(target.id);
+                    mainHandler.post(this::scheduleRetry);
+                });
 
                 byte[] videoHeader = cachedVideoHeader;
                 if (videoHeader != null) {
-                    streamer.startStream(videoHeader, cachedAudioHeader);
+                    created.startStream(videoHeader, cachedAudioHeader);
                 }
 
-                streamer.connect();
-                streamers.put(target.id, streamer);
+                created.connect();
+
+                // The destination may have been removed, edited or the session stopped while
+                // the connection was being established: never publish a stale streamer.
+                if (!isStreaming || generation != generationOf(target.id)) {
+                    Log.i(TAG, "Dropping the now obsolete connection to " + target.name);
+                    created.stop();
+                    return;
+                }
+
+                TelegramStreamer previous = streamers.put(target.id, created);
+                if (previous != null && previous != created) previous.stop();
                 failedChannels.remove(target.id);
+                retryAttempts.remove(target.id);
                 Log.i(TAG, target.name + " is live");
             } catch (Exception e) {
+                if (streamer != null) streamer.stop();
                 failedChannels.add(target.id);
                 Log.e(TAG, "Connection to " + target.name + " failed: " + e.getMessage());
+                mainHandler.post(this::scheduleRetry);
+            } finally {
+                connectingChannels.remove(target.id);
             }
         });
     }
@@ -388,17 +500,40 @@ public class StreamService extends Service implements RTMPServer.StreamCallback,
         channels.add(copy);
         if (isStreaming && isDroneSignalActive && copy.isActive) {
             connectDestination(copy);
+            scheduleRetry();
         }
     }
 
     public void removeChannel(StreamChannel channel) {
         if (channel == null) return;
+        channelGenerations.put(channel.id, generationOf(channel.id) + 1);
+        connectingChannels.remove(channel.id);
         for (StreamChannel existing : new ArrayList<>(channels)) {
             if (existing.id == channel.id) channels.remove(existing);
         }
         TelegramStreamer streamer = streamers.remove(channel.id);
         if (streamer != null) streamer.stop();
         failedChannels.remove(channel.id);
+    }
+
+    /**
+     * Applies an edition (new URL, key, quality...) to a destination already used by the
+     * running session: the old connection is dropped and recreated with the new settings.
+     */
+    public void refreshChannel(StreamChannel channel) {
+        if (channel == null) return;
+        boolean wasRunning = false;
+        for (StreamChannel existing : channels) {
+            if (existing.id == channel.id) {
+                wasRunning = streamers.containsKey(channel.id) || existing.isActive;
+                break;
+            }
+        }
+        removeChannel(channel);
+        if (wasRunning) {
+            retryAttempts.remove(channel.id);
+            addChannel(channel);
+        }
     }
 
     public int getActiveChannelCount() {
@@ -438,6 +573,10 @@ public class StreamService extends Service implements RTMPServer.StreamCallback,
         this.cachedAudioHeader = audioHeader;
         this.isDroneSignalActive = true;
 
+        if (videoHeader != null) {
+            int[] dimensions = H264Utils.parseSpsDimensions(H264Utils.extractSps(videoHeader));
+            if (dimensions != null) videoSize = dimensions;
+        }
         if (videoHeader != null && decoder != null && !isPreviewPausedByBatterySaver() && previewEnabled) {
             decoder.init(videoHeader);
         }
@@ -453,6 +592,7 @@ public class StreamService extends Service implements RTMPServer.StreamCallback,
                 connectDestination(channel);
             }
         }
+        scheduleRetry();
     }
 
     @Override
@@ -481,6 +621,8 @@ public class StreamService extends Service implements RTMPServer.StreamCallback,
     public void onStreamStopped() {
         Log.i(TAG, "Drone stream disconnected");
         isDroneSignalActive = false;
+        cancelRetry();
+        retryAttempts.clear();
         cachedVideoHeader = null;
         cachedAudioHeader = null;
 

@@ -28,6 +28,9 @@ public class PreferenceManager {
     // Battery saver
     private static final String KEY_BATTERY_PAUSES_PREVIEW = "battery_pauses_preview";
 
+    // Network security
+    private static final String KEY_STRICT_TLS = "strict_tls";
+
     public static final int DEFAULT_PORT = 1935;
     public static final String DEFAULT_PATH = "live";
 
@@ -121,6 +124,20 @@ public class PreferenceManager {
         return prefs.getBoolean(KEY_BATTERY_PAUSES_PREVIEW, true);
     }
 
+    // ---------------------------------------------------------------- Security
+
+    /**
+     * When enabled (default) the TLS certificate of an rtmps:// destination must be valid.
+     * Disable it only for a destination using a self-signed certificate.
+     */
+    public void setStrictTls(boolean enabled) {
+        prefs.edit().putBoolean(KEY_STRICT_TLS, enabled).apply();
+    }
+
+    public boolean isStrictTlsEnabled() {
+        return prefs.getBoolean(KEY_STRICT_TLS, true);
+    }
+
     // ------------------------------------------------------------------ Helpers
 
     public void restoreDefaults() {
@@ -134,6 +151,7 @@ public class PreferenceManager {
             .putBoolean(KEY_DEFAULT_BATTERY, false)
             .putBoolean(KEY_PUBLIC_RECORDINGS, false)
             .putBoolean(KEY_BATTERY_PAUSES_PREVIEW, true)
+            .putBoolean(KEY_STRICT_TLS, true)
             .apply();
     }
 }
