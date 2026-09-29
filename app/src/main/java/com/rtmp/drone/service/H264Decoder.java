@@ -5,16 +5,25 @@ import android.media.MediaFormat;
 import android.util.Log;
 import android.view.Surface;
 import java.nio.ByteBuffer;
-import java.util.Arrays;
 
+/**
+ * Hardware H.264 decoder used for the local preview (SurfaceView).
+ * The SPS/PPS sent by the drone are converted to Annex-B and used as csd-0,
+ * the AVCC frames are converted on the fly, and the video size is read from the SPS.
+ */
 public class H264Decoder {
     private static final String TAG = "H264Decoder";
     private static final String MIME_TYPE = "video/avc";
-    
+
+    private static final int FALLBACK_WIDTH = 1280;
+    private static final int FALLBACK_HEIGHT = 720;
+
     private MediaCodec mediaCodec;
     private Surface surface;
     private boolean isConfigured = false;
     private byte[] cachedHeader = null;
+    private boolean enabled = true;
+    private long droppedFrames = 0;
 
     public H264Decoder() {}
 
@@ -22,11 +31,32 @@ public class H264Decoder {
         this.surface = surface;
     }
 
+    /** Battery saver can disable the decoding completely (no preview, no CPU). */
+    public synchronized void setEnabled(boolean enabled) {
+        this.enabled = enabled;
+        if (!enabled) {
+            stop();
+        } else if (cachedHeader != null && surface != null && surface.isValid()) {
+            init(cachedHeader);
+        }
+    }
+
+    public synchronized boolean isEnabled() {
+        return enabled;
+    }
+
+    public synchronized boolean isConfigured() {
+        return isConfigured && mediaCodec != null;
+    }
+
     public synchronized void setSurface(Surface surface) {
         this.surface = surface;
+        if (!enabled) return;
         if (cachedHeader != null && surface != null && surface.isValid()) {
             stop();
             init(cachedHeader);
+        } else if (surface == null || !surface.isValid()) {
+            stop();
         }
     }
 
@@ -34,6 +64,7 @@ public class H264Decoder {
         if (avcConfigHeader == null || avcConfigHeader.length < 11) return;
         this.cachedHeader = avcConfigHeader;
 
+        if (!enabled) return;
         if (surface == null || !surface.isValid()) {
             Log.w(TAG, "Surface not ready yet, SPS/PPS cached");
             return;
@@ -44,68 +75,38 @@ public class H264Decoder {
                 stop();
             }
 
-            byte[] csd0 = extractSpsPpsAnnexB(avcConfigHeader);
-            if (csd0 == null) {
-                Log.e(TAG, "Failed to extract SPS/PPS from sequence header");
+            byte[] csd0 = H264Utils.extractSpsPpsAnnexB(avcConfigHeader);
+            if (csd0 == null || csd0.length == 0) {
+                Log.e(TAG, "Failed to extract SPS/PPS from the sequence header");
                 return;
             }
 
-            MediaFormat format = MediaFormat.createVideoFormat(MIME_TYPE, 1280, 720);
+            int width = FALLBACK_WIDTH;
+            int height = FALLBACK_HEIGHT;
+            int[] dimensions = H264Utils.parseSpsDimensions(H264Utils.extractSps(avcConfigHeader));
+            if (dimensions != null) {
+                width = dimensions[0];
+                height = dimensions[1];
+            }
+
+            MediaFormat format = MediaFormat.createVideoFormat(MIME_TYPE, width, height);
             format.setByteBuffer("csd-0", ByteBuffer.wrap(csd0));
 
             mediaCodec = MediaCodec.createDecoderByType(MIME_TYPE);
             mediaCodec.configure(format, surface, null, 0);
             mediaCodec.start();
             isConfigured = true;
-            Log.i(TAG, "✓ Hardware MediaCodec H.264 started successfully");
+            Log.i(TAG, "Hardware H.264 decoder started (" + width + "x" + height + ")");
         } catch (Exception e) {
             Log.e(TAG, "MediaCodec init error: " + e.getMessage());
             isConfigured = false;
         }
     }
 
-    private byte[] extractSpsPpsAnnexB(byte[] data) {
-        try {
-            int offset = 5; // Skip FLV Video Tag header
-            if (data.length <= offset + 6) return null;
-
-            int spsCount = data[offset + 5] & 0x1F;
-            int pos = offset + 6;
-            if (spsCount == 0 || pos + 2 >= data.length) return null;
-
-            int spsLen = ((data[pos] & 0xFF) << 8) | (data[pos + 1] & 0xFF);
-            pos += 2;
-            if (pos + spsLen >= data.length) return null;
-            byte[] sps = Arrays.copyOfRange(data, pos, pos + spsLen);
-            pos += spsLen;
-
-            int ppsCount = data[pos] & 0xFF;
-            pos += 1;
-            if (ppsCount == 0 || pos + 2 >= data.length) return null;
-
-            int ppsLen = ((data[pos] & 0xFF) << 8) | (data[pos + 1] & 0xFF);
-            pos += 2;
-            if (pos + ppsLen > data.length) return null;
-            byte[] pps = Arrays.copyOfRange(data, pos, pos + ppsLen);
-
-            byte[] annexB = new byte[4 + sps.length + 4 + pps.length];
-            annexB[0] = 0; annexB[1] = 0; annexB[2] = 0; annexB[3] = 1;
-            System.arraycopy(sps, 0, annexB, 4, sps.length);
-            int ppsOffset = 4 + sps.length;
-            annexB[ppsOffset] = 0; annexB[ppsOffset + 1] = 0; annexB[ppsOffset + 2] = 0; annexB[ppsOffset + 3] = 1;
-            System.arraycopy(pps, 0, annexB, ppsOffset + 4, pps.length);
-
-            return annexB;
-        } catch (Exception e) {
-            Log.e(TAG, "Error extracting SPS/PPS: " + e.getMessage());
-            return null;
-        }
-    }
-
     public synchronized void decodeFrame(byte[] data) {
-        if (data == null || data.length < 5) return;
+        if (!enabled || data == null || data.length < 5) return;
 
-        if (data[0] == 0x17 && data[1] == 0x00) {
+        if (H264Utils.isSequenceHeader(data)) {
             init(data);
             return;
         }
@@ -117,7 +118,7 @@ public class H264Decoder {
             if (!isConfigured || mediaCodec == null) return;
         }
 
-        int offset = 5;
+        int offset = 5; // skip the FLV video tag header
         while (offset + 4 < data.length) {
             int naluLen = ((data[offset] & 0xFF) << 24) |
                           ((data[offset + 1] & 0xFF) << 16) |
@@ -137,15 +138,27 @@ public class H264Decoder {
     }
 
     private void feedMediaCodec(byte[] nalu) {
+        if (!isConfigured || mediaCodec == null) return;
         try {
-            int inIndex = mediaCodec.dequeueInputBuffer(10000);
+            // Never wait for an input buffer: the preview is the least important consumer of
+            // the stream and must not slow down the relay nor the local recording.
+            int inIndex = mediaCodec.dequeueInputBuffer(0);
             if (inIndex >= 0) {
                 ByteBuffer inputBuffer = mediaCodec.getInputBuffer(inIndex);
                 if (inputBuffer != null) {
                     inputBuffer.clear();
-                    inputBuffer.put(nalu);
-                    mediaCodec.queueInputBuffer(inIndex, 0, nalu.length, System.nanoTime() / 1000, 0);
+                    if (inputBuffer.capacity() >= nalu.length) {
+                        inputBuffer.put(nalu);
+                        mediaCodec.queueInputBuffer(inIndex, 0, nalu.length, System.nanoTime() / 1000, 0);
+                    } else {
+                        // Frame bigger than the codec buffer (unusual resolution): give the
+                        // buffer back instead of throwing, the next frames are unaffected.
+                        mediaCodec.queueInputBuffer(inIndex, 0, 0, System.nanoTime() / 1000, 0);
+                        droppedFrames++;
+                    }
                 }
+            } else {
+                droppedFrames++;
             }
 
             MediaCodec.BufferInfo info = new MediaCodec.BufferInfo();
@@ -155,8 +168,15 @@ public class H264Decoder {
                 outIndex = mediaCodec.dequeueOutputBuffer(info, 0);
             }
         } catch (Exception e) {
+            // A dead surface (fullscreen preview closed) makes every call fail: stop the
+            // codec here and let the next setSurface() re-initialise it.
             Log.e(TAG, "Decode error: " + e.getMessage());
+            stop();
         }
+    }
+
+    public long getDroppedFrames() {
+        return droppedFrames;
     }
 
     public synchronized void stop() {
@@ -164,6 +184,8 @@ public class H264Decoder {
         if (mediaCodec != null) {
             try {
                 mediaCodec.stop();
+            } catch (Exception ignored) {}
+            try {
                 mediaCodec.release();
             } catch (Exception ignored) {}
             mediaCodec = null;

@@ -15,3 +15,10 @@
 local.properties
 *.apk
 *.aab
+
+# Build outputs (never commit them)
+build/
+app/build/
+
+# Keep the Gradle wrapper in version control
+!gradle/wrapper/gradle-wrapper.jar

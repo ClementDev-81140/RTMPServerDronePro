@@ -1,0 +1,346 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@color/bg_dark">
+
+    <!-- Header -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="60dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:background="@color/bg_card"
+        android:paddingStart="8dp"
+        android:paddingEnd="16dp"
+        android:elevation="4dp">
+
+        <ImageButton
+            android:id="@+id/buttonBack"
+            android:layout_width="42dp"
+            android:layout_height="42dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:src="@android:drawable/ic_menu_close_clear_cancel"
+            android:contentDescription="@string/action_cancel"
+            app:tint="@color/text_primary"/>
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="8dp"
+            android:text="@string/settings_title"
+            android:textColor="@color/text_primary"
+            android:textSize="18sp"
+            android:textStyle="bold"/>
+    </LinearLayout>
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:fillViewport="true">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <!-- ============ SERVER ============ -->
+            <TextView
+                style="@style/SectionTitle"
+                android:text="@string/settings_section_server"/>
+
+            <com.google.android.material.card.MaterialCardView style="@style/SettingsCard">
+
+                <LinearLayout style="@style/SettingsCardContent">
+
+                    <TextView
+                        style="@style/FieldLabel"
+                        android:text="@string/settings_port"/>
+                    <EditText
+                        android:id="@+id/editTextPort"
+                        style="@style/FieldInput"
+                        android:hint="@string/settings_port_hint"
+                        android:inputType="number"
+                        android:maxLength="5"/>
+                    <TextView
+                        style="@style/FieldSummary"
+                        android:text="@string/settings_port_summary"/>
+
+                    <TextView
+                        style="@style/FieldLabel"
+                        android:layout_marginTop="14dp"
+                        android:text="@string/settings_path"/>
+                    <EditText
+                        android:id="@+id/editTextPath"
+                        style="@style/FieldInput"
+                        android:hint="@string/settings_path_hint"
+                        android:inputType="text"
+                        android:singleLine="true"/>
+                    <TextView
+                        style="@style/FieldSummary"
+                        android:text="@string/settings_path_summary"/>
+
+                    <LinearLayout style="@style/SwitchRow">
+                        <LinearLayout style="@style/SwitchRowTexts">
+                            <TextView
+                                style="@style/SwitchTitle"
+                                android:text="@string/settings_auto_start"/>
+                            <TextView
+                                style="@style/FieldSummary"
+                                android:text="@string/settings_auto_start_summary"/>
+                        </LinearLayout>
+                        <com.google.android.material.switchmaterial.SwitchMaterial
+                            android:id="@+id/switchAutoStart"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"/>
+                    </LinearLayout>
+
+                    <LinearLayout style="@style/SwitchRow">
+                        <LinearLayout style="@style/SwitchRowTexts">
+                            <TextView
+                                style="@style/SwitchTitle"
+                                android:text="@string/settings_keep_screen_on"/>
+                            <TextView
+                                style="@style/FieldSummary"
+                                android:text="@string/settings_keep_screen_on_summary"/>
+                        </LinearLayout>
+                        <com.google.android.material.switchmaterial.SwitchMaterial
+                            android:id="@+id/switchKeepScreenOn"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"/>
+                    </LinearLayout>
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- ============ STREAMING DEFAULTS ============ -->
+            <TextView
+                style="@style/SectionTitle"
+                android:text="@string/settings_section_defaults"/>
+
+            <com.google.android.material.card.MaterialCardView style="@style/SettingsCard">
+
+                <LinearLayout style="@style/SettingsCardContent">
+
+                    <LinearLayout style="@style/SwitchRow">
+                        <LinearLayout style="@style/SwitchRowTexts">
+                            <TextView
+                                style="@style/SwitchTitle"
+                                android:text="@string/settings_default_preview"/>
+                            <TextView
+                                style="@style/FieldSummary"
+                                android:text="@string/settings_default_preview_summary"/>
+                        </LinearLayout>
+                        <com.google.android.material.switchmaterial.SwitchMaterial
+                            android:id="@+id/switchDefaultPreview"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"/>
+                    </LinearLayout>
+
+                    <LinearLayout style="@style/SwitchRow">
+                        <LinearLayout style="@style/SwitchRowTexts">
+                            <TextView
+                                style="@style/SwitchTitle"
+                                android:text="@string/settings_default_recording"/>
+                            <TextView
+                                style="@style/FieldSummary"
+                                android:text="@string/settings_default_recording_summary"/>
+                        </LinearLayout>
+                        <com.google.android.material.switchmaterial.SwitchMaterial
+                            android:id="@+id/switchDefaultRecording"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"/>
+                    </LinearLayout>
+
+                    <LinearLayout style="@style/SwitchRow">
+                        <LinearLayout style="@style/SwitchRowTexts">
+                            <TextView
+                                style="@style/SwitchTitle"
+                                android:text="@string/settings_default_battery"/>
+                            <TextView
+                                style="@style/FieldSummary"
+                                android:text="@string/settings_default_battery_summary"/>
+                        </LinearLayout>
+                        <com.google.android.material.switchmaterial.SwitchMaterial
+                            android:id="@+id/switchDefaultBattery"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"/>
+                    </LinearLayout>
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- ============ RECORDING ============ -->
+            <TextView
+                style="@style/SectionTitle"
+                android:text="@string/settings_section_recording"/>
+
+            <com.google.android.material.card.MaterialCardView style="@style/SettingsCard">
+
+                <LinearLayout style="@style/SettingsCardContent">
+
+                    <LinearLayout style="@style/SwitchRow">
+                        <LinearLayout style="@style/SwitchRowTexts">
+                            <TextView
+                                style="@style/SwitchTitle"
+                                android:text="@string/settings_public_recordings"/>
+                            <TextView
+                                style="@style/FieldSummary"
+                                android:text="@string/settings_public_recordings_summary"/>
+                        </LinearLayout>
+                        <com.google.android.material.switchmaterial.SwitchMaterial
+                            android:id="@+id/switchPublicRecordings"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"/>
+                    </LinearLayout>
+
+                    <TextView
+                        android:id="@+id/textViewPublicWarning"
+                        style="@style/FieldSummary"
+                        android:text="@string/settings_public_unavailable"
+                        android:textColor="@color/error"
+                        android:visibility="gone"/>
+
+                    <TextView
+                        style="@style/FieldLabel"
+                        android:layout_marginTop="14dp"
+                        android:text="@string/settings_recordings_folder"/>
+                    <TextView
+                        android:id="@+id/textViewRecordingsPath"
+                        style="@style/FieldInput"
+                        android:fontFamily="monospace"
+                        android:textSize="12sp"/>
+                    <TextView
+                        android:id="@+id/textViewRecordingsStats"
+                        style="@style/FieldSummary"/>
+
+                    <TextView
+                        style="@style/FieldSummary"
+                        android:layout_marginTop="10dp"
+                        android:text="@string/settings_recording_format"/>
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- ============ BATTERY SAVER ============ -->
+            <TextView
+                style="@style/SectionTitle"
+                android:text="@string/settings_section_battery"/>
+
+            <com.google.android.material.card.MaterialCardView style="@style/SettingsCard">
+
+                <LinearLayout style="@style/SettingsCardContent">
+
+                    <LinearLayout style="@style/SwitchRow">
+                        <LinearLayout style="@style/SwitchRowTexts">
+                            <TextView
+                                style="@style/SwitchTitle"
+                                android:text="@string/settings_battery_disable_preview"/>
+                            <TextView
+                                style="@style/FieldSummary"
+                                android:text="@string/settings_battery_disable_preview_summary"/>
+                        </LinearLayout>
+                        <com.google.android.material.switchmaterial.SwitchMaterial
+                            android:id="@+id/switchBatteryDisablesPreview"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"/>
+                    </LinearLayout>
+
+                    <TextView
+                        style="@style/FieldSummary"
+                        android:text="@string/settings_battery_details"/>
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- ============ SECURITY ============ -->
+            <TextView
+                style="@style/SectionTitle"
+                android:text="@string/settings_section_security"/>
+
+            <com.google.android.material.card.MaterialCardView style="@style/SettingsCard">
+
+                <LinearLayout style="@style/SettingsCardContent">
+
+                    <LinearLayout style="@style/SwitchRow">
+                        <LinearLayout style="@style/SwitchRowTexts">
+                            <TextView
+                                style="@style/SwitchTitle"
+                                android:text="@string/settings_strict_tls"/>
+                            <TextView
+                                style="@style/FieldSummary"
+                                android:text="@string/settings_strict_tls_summary"/>
+                        </LinearLayout>
+                        <com.google.android.material.switchmaterial.SwitchMaterial
+                            android:id="@+id/switchStrictTls"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"/>
+                    </LinearLayout>
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- ============ ABOUT ============ -->
+            <TextView
+                style="@style/SectionTitle"
+                android:text="@string/settings_section_about"/>
+
+            <com.google.android.material.card.MaterialCardView style="@style/SettingsCard">
+
+                <LinearLayout style="@style/SettingsCardContent">
+
+                    <TextView
+                        style="@style/SwitchTitle"
+                        android:text="@string/app_name"/>
+                    <TextView
+                        android:id="@+id/textViewVersion"
+                        style="@style/FieldSummary"/>
+                    <TextView
+                        style="@style/FieldSummary"
+                        android:layout_marginTop="8dp"
+                        android:text="@string/settings_about_text"/>
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <Button
+                android:id="@+id/buttonRestoreDefaults"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:layout_marginTop="4dp"
+                android:text="@string/action_restore_defaults"
+                android:textColor="@color/text_secondary"
+                android:backgroundTint="#2D2D35"/>
+        </LinearLayout>
+    </ScrollView>
+
+    <!-- Footer -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:background="@color/bg_card"
+        android:padding="12dp"
+        android:elevation="8dp">
+
+        <Button
+            android:id="@+id/buttonCancelSettings"
+            android:layout_width="0dp"
+            android:layout_height="48dp"
+            android:layout_weight="1"
+            android:layout_marginEnd="8dp"
+            android:text="@string/action_cancel"
+            android:textColor="@color/text_primary"
+            android:backgroundTint="#2D2D35"/>
+
+        <Button
+            android:id="@+id/buttonSaveSettings"
+            android:layout_width="0dp"
+            android:layout_height="48dp"
+            android:layout_weight="1"
+            android:layout_marginStart="8dp"
+            android:text="@string/action_save"
+            android:textColor="#FFFFFF"
+            android:textStyle="bold"
+            android:backgroundTint="@color/primary"/>
+    </LinearLayout>
+</LinearLayout>

@@ -12,6 +12,9 @@ import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.view.WindowCompat;
+import androidx.core.view.WindowInsetsCompat;
+import androidx.core.view.WindowInsetsControllerCompat;
 import com.rtmp.drone.R;
 import com.rtmp.drone.service.StreamService;
 
@@ -45,12 +48,22 @@ public class FullscreenPreviewActivity extends AppCompatActivity {
         getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN, WindowManager.LayoutParams.FLAG_FULLSCREEN);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
 
+        // Immersive mode: the drone feed uses the whole screen.
+        WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
+        WindowInsetsControllerCompat controller =
+                WindowCompat.getInsetsController(getWindow(), getWindow().getDecorView());
+        if (controller != null) {
+            controller.hide(WindowInsetsCompat.Type.systemBars());
+            controller.setSystemBarsBehavior(
+                    WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
+        }
+
         setContentView(R.layout.activity_fullscreen_preview);
 
         surfaceView = findViewById(R.id.fullscreenSurfaceView);
         View root = findViewById(R.id.fullscreenRoot);
 
-        root.setOnClickListener(v -> finish()); // Tap sur l'écran pour quitter le plein écran
+        root.setOnClickListener(v -> finish()); // Tap anywhere to leave the fullscreen preview
 
         surfaceView.getHolder().addCallback(new SurfaceHolder.Callback() {
             @Override
@@ -63,6 +76,8 @@ public class FullscreenPreviewActivity extends AppCompatActivity {
             public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {}
             @Override
             public void surfaceDestroyed(SurfaceHolder holder) {
+                // Detach the surface so the decoder stops instead of failing on a dead
+                // surface; the main screen re-attaches its own surface when it comes back.
                 if (serviceBound && streamService != null) {
                     streamService.setPreviewSurface(null);
                 }

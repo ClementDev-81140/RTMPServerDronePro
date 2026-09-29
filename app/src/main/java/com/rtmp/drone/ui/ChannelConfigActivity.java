@@ -9,6 +9,7 @@ import com.google.android.material.switchmaterial.SwitchMaterial;
 import com.rtmp.drone.R;
 import com.rtmp.drone.database.AppDatabase;
 import com.rtmp.drone.model.StreamChannel;
+import com.rtmp.drone.utils.NetworkUtils;
 
 public class ChannelConfigActivity extends AppCompatActivity {
     public static final String EXTRA_CHANNEL_ID = "extra_channel_id";
@@ -67,8 +68,11 @@ public class ChannelConfigActivity extends AppCompatActivity {
         btnCancel = findViewById(R.id.buttonCancelChannel);
 
         if (switchIsPrimary != null) {
-            int[][] states = new int[][] { new int[] { android.R.attr.state_checked }, new int[] { -android.R.attr.state_checked } };
-            int[] thumbColors = new int[] { Color.parseColor("#FFD700"), Color.parseColor("#FFFFFF") }; // Doré sur ON
+            int[][] states = new int[][] {
+                new int[] { android.R.attr.state_checked },
+                new int[] { -android.R.attr.state_checked }
+            };
+            int[] thumbColors = new int[] { Color.parseColor("#FFD700"), Color.parseColor("#FFFFFF") };
             int[] trackColors = new int[] { Color.parseColor("#66FFD700"), Color.parseColor("#3D3D48") };
             switchIsPrimary.setThumbTintList(new ColorStateList(states, thumbColors));
             switchIsPrimary.setTrackTintList(new ColorStateList(states, trackColors));
@@ -84,11 +88,15 @@ public class ChannelConfigActivity extends AppCompatActivity {
         String key = editKey != null ? editKey.getText().toString().trim() : "";
 
         if (name.isEmpty()) {
-            Toast.makeText(this, "Please enter a channel name", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, R.string.error_name_required, Toast.LENGTH_SHORT).show();
             return;
         }
         if (url.isEmpty()) {
-            Toast.makeText(this, "Please enter RTMP/RTMPS URL", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, R.string.error_url_required, Toast.LENGTH_SHORT).show();
+            return;
+        }
+        if (!NetworkUtils.isValidUrl(url)) {
+            Toast.makeText(this, R.string.error_url_invalid, Toast.LENGTH_LONG).show();
             return;
         }
 
@@ -112,10 +120,8 @@ public class ChannelConfigActivity extends AppCompatActivity {
 
         if (isPrimary) {
             db.channelDao().clearAllPrimary();
-            editingChannel.isPrimary = true;
-        } else {
-            editingChannel.isPrimary = false;
         }
+        editingChannel.isPrimary = isPrimary;
 
         if (editingChannel.id > 0) {
             db.channelDao().updateChannel(editingChannel);
@@ -123,6 +129,7 @@ public class ChannelConfigActivity extends AppCompatActivity {
             db.channelDao().insertChannel(editingChannel);
         }
 
+        Toast.makeText(this, R.string.channel_saved, Toast.LENGTH_SHORT).show();
         setResult(RESULT_SAVED);
         finish();
     }
